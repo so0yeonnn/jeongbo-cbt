@@ -169,14 +169,18 @@ function renderQuestion(){
   $('flag-button').classList.toggle('active',Boolean(flags[current])); $('flag-button').textContent=flags[current]?'검토 해제':'검토';
 }
 
+function renderOptionReasons(q){
+  const rows=globalThis.CBT_OPTION_EXPLAINER.optionExplanations(q);
+  return '<section class="feedback-section option-reasons"><h4>선지별 판단</h4><ul class="option-reason-list">'+rows.map((row,index)=>'<li class="'+(row.correct?'reason-correct':'reason-wrong')+'"><div class="reason-heading"><strong>'+letters[index]+'. '+esc(row.label)+'</strong><span>'+(row.correct?'정답':'오답')+'</span></div><div class="reason-option">'+esc(q.options[index])+'</div><p>'+esc(row.detail)+'</p><small>근거: '+esc(row.basis)+'</small></li>').join('')+'</ul></section>';
+}
+
 function renderInstantFeedback(q){
   const box=$('instant-feedback');
   if(solveMode!=='study'||!answers[current]?.length){box.className='instant-feedback hidden';box.innerHTML='';return;}
   if(q.void){box.className='instant-feedback';box.innerHTML='<div class="feedback-title"><strong>채점 제외 문항</strong></div><p>원본 정답표에서 정답을 하나로 확정할 수 없어 점수에는 반영하지 않습니다.</p>';return;}
   const correct=isCorrect(q,answers[current]);
   const answer=q.answer.map(i=>`${letters[i]}. ${q.options[i]}`).join(', ');
-  const reasonRows=q.optionReasons||[]; const uniqueReasons=[...new Set(reasonRows)];
-  const reasons=uniqueReasons.length===1?`<p>${esc(uniqueReasons[0])}</p>`:`<ul class="option-reason-list">${reasonRows.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('')}</ul>`;
+  const reasons=renderOptionReasons(q);
   box.className=`instant-feedback ${correct?'correct':'incorrect'}`;
   const concept=globalThis.CBT_CONCEPTS.profile(q);
   box.innerHTML=`<div class="feedback-title"><strong>${correct?'정답입니다':'다시 확인해 보세요'}</strong><span>정답 ${esc(answer)}</span></div><section class="feedback-section"><h4>해설</h4><p>${esc(q.explanation)}</p></section>${reasons}<section class="feedback-section"><h4>핵심 개념</h4><ul>${concept.summary.map(line=>`<li>${esc(line)}</li>`).join('')}</ul></section><div class="memory-point"><strong>시험 암기 포인트</strong><span>${esc(concept.memory)}</span></div><section class="feedback-section"><h4>자주 헷갈리는 개념</h4><p>${esc(concept.compare)}</p></section><div class="keyword-tags">${concept.keywords.slice(0,5).map(word=>`<span>${esc(word)}</span>`).join('')}</div>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}`;
@@ -236,8 +240,7 @@ function renderReview(q,index){
   const correct=isCorrect(q,answers[index]);
   const selected=answers[index]?.length?answers[index].map(i=>`${letters[i]}. ${q.options[i]}`).join(', '):'미응답';
   const answer=q.answer.map(i=>`${letters[i]}. ${q.options[i]}`).join(', ');
-  const reasonRows=q.optionReasons||[]; const uniqueReasons=[...new Set(reasonRows)];
-  const reasons=uniqueReasons.length===1?`<p>${esc(uniqueReasons[0])}</p>`:`<ul class="option-reason-list">${reasonRows.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('')}</ul>`;
+  const reasons=renderOptionReasons(q);
   if(q.void)return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">채점 제외 · ${esc(q.id)}</span><p>${esc(q.explanation)}</p></article>`;
   const concept=globalThis.CBT_CONCEPTS.profile(q);const low=confidences[index]==='low';
   return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span>${low?'<span class="uncertain-badge">애매한 정답</span>':''}<p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p>${reasons}<div class="memory-point"><strong>${esc(concept.label)}</strong><span>${esc(concept.memory)}</span></div><p><strong>헷갈리는 개념:</strong> ${esc(concept.compare)}</p><div class="keyword-tags">${concept.keywords.slice(0,5).map(word=>`<span>${esc(word)}</span>`).join('')}</div>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}${q.conceptDetail?`<p><strong>관련 개념:</strong> ${esc(q.conceptDetail)}</p>`:''}${q.judgmentRule?`<p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p>`:''}</article>`;

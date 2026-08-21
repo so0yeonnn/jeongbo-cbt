@@ -22,6 +22,10 @@ if(!app.includes('confidences')||!app.includes('취약 개념 TOP10')&&!fs.readF
 if(!app.includes('dailyPriorities')||!html.includes('오늘 복습 TOP20'))throw new Error('daily concept priorities');
 const concepts=fs.readFileSync('concept-engine.js','utf8');
 if(!concepts.includes('CBT_CONCEPTS')||!concepts.includes('slice(-6)'))throw new Error('concept analysis engine');
+context.CBT_CONCEPTS={profile:()=>({memory:'판단 기준',compare:'비교 기준'})};
+vm.runInContext(fs.readFileSync('option-explainer.js','utf8'),context);
+const optionRows=context.CBT_OPTION_EXPLAINER.optionExplanations({stem:'옳은 것은?',options:['Builder','Visitor','Bridge','Prototype'],answer:[1],optionReasons:[]});
+if(optionRows.length!==4||!optionRows[1].correct||optionRows[0].correct||optionRows.some(row=>!row.detail||!row.basis))throw new Error('per-option explanations');
 const drive=fs.readFileSync('drive-sync.js','utf8');
 if(!drive.includes('https://www.googleapis.com/auth/drive.appdata')||!drive.includes("parents:['appDataFolder']"))throw new Error('private Drive appDataFolder sync');
 if(/client_secret/i.test(drive))throw new Error('client secret must not be published');

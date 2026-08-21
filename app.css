@@ -191,8 +191,15 @@ dialog::backdrop { background: rgba(17,24,39,.55); }
 
 .filter-label{margin:18px 0 8px;font-weight:800;color:var(--ink);font-size:.9rem}
 .exit-button{margin-top:10px;width:100%}
-.option-reason-list{margin:12px 0 0;padding:12px 14px;background:var(--bg);border-radius:12px;list-style:none}
-.option-reason-list li{margin:7px 0;line-height:1.55}
+.option-reason-list{display:grid;gap:10px;margin:12px 0 0;padding:0;list-style:none}
+.option-reason-list li{padding:12px 13px;border:1px solid var(--line);border-left:4px solid #d14b4b;border-radius:12px;background:var(--bg);line-height:1.55}
+.option-reason-list li.reason-correct{border-left-color:#12805c;background:rgba(18,128,92,.08)}
+.reason-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.reason-heading span{flex:none;padding:3px 8px;border-radius:999px;background:#fde7e7;color:#9d2525;font-size:.75rem;font-weight:800}
+.reason-correct .reason-heading span{background:#dff4ec;color:#087354}
+.option-reason-list p{margin:8px 0 4px}
+.reason-option{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface);font-weight:700}
+.option-reason-list small{color:var(--muted);font-weight:700}
 .review-clue{padding:12px 14px;background:var(--accent);border-left:4px solid var(--accent-line);border-radius:8px;margin:12px 0}
 .source-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:var(--bg);color:var(--muted);font-size:.78rem;font-weight:700}
 .question-layout pre{white-space:pre-wrap;overflow:auto;background:#111827;color:#f9fafb;padding:14px;border-radius:12px;font-size:.9rem}
