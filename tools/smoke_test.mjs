@@ -19,6 +19,7 @@ if(!html.includes('private-pack-input')||!html.includes('drive-connect')||html.i
 const app=fs.readFileSync('app.js','utf8');
 if(!app.includes("jeongbo-private-pack-v2")||!app.includes('questions.length!==1800')||!app.includes('sets.size!==18'))throw new Error('2020-2025 pack validation');
 if(!app.includes('confidences')||!app.includes('취약 개념 TOP10')&&!fs.readFileSync('index.html','utf8').includes('취약 개념 TOP10'))throw new Error('confidence and weak concept analysis');
+if(!app.includes('dailyPriorities')||!html.includes('오늘 복습 TOP20'))throw new Error('daily concept priorities');
 const concepts=fs.readFileSync('concept-engine.js','utf8');
 if(!concepts.includes('CBT_CONCEPTS')||!concepts.includes('slice(-6)'))throw new Error('concept analysis engine');
 const drive=fs.readFileSync('drive-sync.js','utf8');

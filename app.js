@@ -41,6 +41,19 @@ function getWrongRecords(){return readJson(WRONG_KEY,{version:1,records:{}});}
 function saveWrongRecords(value){writeJson(WRONG_KEY,value);}
 function activeWrongs(){const all=getWrongRecords().records;return Object.values(all).filter(row=>row.active).sort((a,b)=>(b.wrongCount||0)-(a.wrongCount||0));}
 
+function dailyPriorities(){
+  const frequency=globalThis.CBT_CONCEPTS.frequency(questionBank);const frequencyMap=new Map(frequency.map(row=>[`${row.subject}::${row.concept}`,row]));const map=new Map();
+  activeWrongs().forEach(record=>{
+    const q=questionBank.find(item=>item.id===record.id)||record.question;if(!q)return;
+    const p=globalThis.CBT_CONCEPTS.profile(q),key=`${q.subject}::${p.label}`,row=map.get(key)||{subject:q.subject,concept:p.label,wrong:0,attempts:0,correct:0,lastWrongAt:null};
+    row.wrong+=record.wrongCount||1;row.attempts+=(record.history||[]).length;row.correct+=(record.history||[]).filter(item=>item.correct).length;
+    if(!row.lastWrongAt||record.lastWrongAt>row.lastWrongAt)row.lastWrongAt=record.lastWrongAt;map.set(key,row);
+  });
+  const rows=[...map.entries()].map(([key,row])=>{const freq=frequencyMap.get(key)||{count:0,level:'하'};const rate=row.attempts?Math.round(row.correct/row.attempts*100):0;const days=row.lastWrongAt?Math.max(0,(Date.now()-Date.parse(row.lastWrongAt))/86400000):999;const recent=days<=7?3:days<=30?2:1;const levelScore={상:3,중:2,하:1}[freq.level]||1;return {...row,rate,frequency:freq.count,level:freq.level,score:row.wrong*4+(100-rate)/20+recent+levelScore};}).sort((a,b)=>b.score-a.score||b.frequency-a.frequency);
+  if(rows.length)return rows.slice(0,20);
+  return frequency.slice(0,20).map(row=>({subject:row.subject,concept:row.concept,wrong:0,rate:null,frequency:row.count,level:row.level,score:row.count}));
+}
+
 function progressSnapshot(){
   return {
     version:2,
@@ -113,6 +126,8 @@ function renderStart(){
   $('wrong-start').classList.toggle('hidden',!wrongs.length);
   $('wrong-start').textContent=`저장된 오답 ${wrongs.length}문제 다시 풀기`;
   $('resume-button').classList.toggle('hidden',!localStorage.getItem(SESSION_KEY));
+  const priorities=dailyPriorities();
+  $('daily-priorities').innerHTML=priorities.map((row,index)=>`<div class="daily-row"><b>${index+1}. ${esc(row.concept)}</b><small>${esc(row.subject)} · ${row.wrong?`누적 오답 ${row.wrong} · 정답률 ${row.rate}% · `:''}최근 6회 ${row.frequency}문항</small><span class="frequency ${row.level==='상'?'high':row.level==='중'?'medium':'low'}">${row.level}</span></div>`).join('');
 }
 
 function checkedValues(id){return [...$(id).querySelectorAll('input:checked')].map(input=>input.value);}
