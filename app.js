@@ -3,7 +3,7 @@
 const SESSION_KEY='jeongbo-cbt-session-v2';
 const WRONG_KEY='jeongbo-cbt-wrongs-v2';
 const RESULT_KEY='jeongbo-cbt-results-v2';
-const PACK_DB='jeongbo-private-pack-v1';
+const PACK_DB='jeongbo-private-pack-v2';
 const PACK_STORE='packs';
 let questionBank=[];
 let packMeta=null;
@@ -45,9 +45,9 @@ async function writePack(pack){const db=await openPackDb();return new Promise((r
 async function deletePack(){const db=await openPackDb();return new Promise((resolve,reject)=>{const request=db.transaction(PACK_STORE,'readwrite').objectStore(PACK_STORE).delete('active');request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error);});}
 
 function validatePack(pack){
-  if(pack?.meta?.format!=='jeongbo-private-pack-v1'||!Array.isArray(pack.questions))throw new Error('정보처리기사 개인용 기출팩 형식이 아닙니다.');
+  if(pack?.meta?.format!=='jeongbo-private-pack-v2'||!Array.isArray(pack.questions))throw new Error('정보처리기사 2020~2025 개인용 기출팩 형식이 아닙니다.');
   const sets=new Set(pack.questions.map(q=>q.round));
-  if(pack.questions.length!==1500||sets.size!==15)throw new Error(`15회·1,500문항 기출팩이 아닙니다. (${sets.size}회·${pack.questions.length}문항)`);
+  if(pack.questions.length!==1800||sets.size!==18)throw new Error(`18회·1,800문항 기출팩이 아닙니다. (${sets.size}회·${pack.questions.length}문항)`);
   if(pack.questions.some(q=>!q.id||!q.stem||q.options?.length!==4||!q.year||!q.round))throw new Error('필수 문항 정보가 누락된 기출팩입니다.');
   return true;
 }
@@ -197,7 +197,7 @@ $('private-pack-input').onchange=async event=>{
   try{
     const pack=JSON.parse(await file.text()); validatePack(pack); await writePack(pack);
     questionBank=pack.questions; packMeta=pack.meta; localStorage.removeItem(SESSION_KEY);
-    $('pack-status').textContent='15회·1,500문항 기출팩을 이 기기에 저장했습니다.'; renderStart();
+    $('pack-status').textContent='18회·1,800문항 기출팩을 이 기기에 저장했습니다.'; renderStart();
   }catch(error){$('pack-status').textContent=`불러오기 실패: ${error.message}`;}
   event.target.value='';
 };

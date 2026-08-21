@@ -16,4 +16,6 @@ if(logic.updateWrongRecord(null,q,q.answer,true,'2026-08-21T00:03:00Z')!==null)t
 if(fs.existsSync('bank.js')||fs.existsSync('question-bank.json'))throw new Error('public question data must not exist');
 const html=fs.readFileSync('index.html','utf8');
 if(!html.includes('private-pack-input')||html.includes('bank.js'))throw new Error('private pack importer');
+const app=fs.readFileSync('app.js','utf8');
+if(!app.includes("jeongbo-private-pack-v2")||!app.includes('questions.length!==1800')||!app.includes('sets.size!==18'))throw new Error('2020-2025 pack validation');
 console.log(JSON.stringify({publicQuestions:0,wrongCount:row.wrongCount,active:row.active,history:row.history.length}));

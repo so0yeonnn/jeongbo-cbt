@@ -1,4 +1,4 @@
-"""Build a personal-use 2021-2025 exam pack from supplied Sinagong PDFs.
+"""Build a personal-use 2020-2025 exam pack from supplied Sinagong PDFs.
 
 The generated pack is written below the ignored private-source directory and
 must never be committed or published. Text extraction is used where reliable;
@@ -17,14 +17,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pdfplumber
+from PIL import Image
 from pypdf import PdfReader
 
-YEARS = range(2021, 2026)
+YEARS = range(2020, 2026)
 MARKS = "①②③④"
 MARK_INDEX = {mark: index for index, mark in enumerate(MARKS)}
 SUBJECTS = ["소프트웨어 설계", "소프트웨어 개발", "데이터베이스 구축", "프로그래밍 언어 활용", "정보시스템 구축관리"]
 QSTART = re.compile(r"(?m)^\s*(\d{1,3})[.)]\s+")
-ROUND_RE = re.compile(r"(?:^|년|\s)([123])회")
+ROUND_RE = re.compile(r"(?:^|년|\s)([1234])회")
 ANSWER_RE = re.compile(r"(\d{1,3})\.\s*((?:[①②③④](?:\s*[,，]\s*)?)+|복수정답)")
 LAYOUT_HINTS = (
     "다음 그림", "다음 트리", "다음 그래프", "다음 표", "다음 자료", "다음 코드",
@@ -77,9 +78,15 @@ def answer_map(pdf, path: Path) -> tuple[dict[int, list[int]], set[int]]:
     return answers, voids
 
 
-def source_round(filename: str) -> int | None:
+def source_round(filename: str, year: int) -> str | None:
+    if year == 2020 and re.search(r"1\s*[,·]\s*2회", filename):
+        return "1-2"
     match = ROUND_RE.search(filename)
-    return int(match.group(1)) if match else None
+    return match.group(1) if match else None
+
+
+def round_label(year: int, round_code: str) -> str:
+    return "2020년 1·2회 통합" if year == 2020 and round_code == "1-2" else f"{year}년 {round_code}회"
 
 
 def question_positions(page, half: tuple[float, float, float, float]):
@@ -98,32 +105,57 @@ def question_positions(page, half: tuple[float, float, float, float]):
     return sorted(unique.items(), key=lambda row: row[1])
 
 
-def image_for(page, half, number: int) -> str | None:
-    positions = question_positions(page, half)
-    match_index = next((index for index, row in enumerate(positions) if row[0] == number), None)
-    if match_index is None:
-        return None
-    top = max(0, positions[match_index][1] - 8)
-    bottom = positions[match_index + 1][1] - 5 if match_index + 1 < len(positions) else page.height - 24
+def render_segment(page, half, top: float, bottom: float):
+    top = max(0, top)
+    bottom = min(page.height, bottom)
     if bottom <= top + 16:
         return None
-    crop = page.crop((half[0], top, half[2], min(page.height, bottom)))
-    image = crop.to_image(resolution=150).original.convert("RGB")
+    crop = page.crop((half[0], top, half[2], bottom))
+    return crop.to_image(resolution=150).original.convert("RGB")
+
+
+def image_for_question(segments, number: int, location) -> str | None:
+    start_index = next((index for index, row in enumerate(segments) if row[0] == location[0] and row[2] == location[1]), None)
+    if start_index is None:
+        return None
+    start_positions = segments[start_index][3]
+    start_top = next((top for candidate, top in start_positions if candidate == number), None)
+    if start_top is None:
+        return None
+    end_index = None
+    end_top = None
+    for index in range(start_index, len(segments)):
+        next_top = next((top for candidate, top in segments[index][3] if candidate == number + 1), None)
+        if next_top is not None:
+            end_index, end_top = index, next_top
+            break
+    if end_index is None:
+        end_index = start_index
+        end_top = segments[start_index][1].height - 24
+    pieces = []
+    for index in range(start_index, end_index + 1):
+        _, page, half, _ = segments[index]
+        top = start_top - 8 if index == start_index else 22
+        bottom = end_top - 5 if index == end_index else page.height - 24
+        piece = render_segment(page, half, top, bottom)
+        if piece is not None:
+            pieces.append(piece)
+    if not pieces:
+        return None
+    width = max(piece.width for piece in pieces)
+    height = sum(piece.height for piece in pieces)
+    image = pieces[0] if len(pieces) == 1 else Image.new("RGB", (width, height), "white")
+    if len(pieces) > 1:
+        offset = 0
+        for piece in pieces:
+            image.paste(piece, (0, offset))
+            offset += piece.height
     output = io.BytesIO()
     image.save(output, format="JPEG", quality=84, optimize=True)
     return "data:image/jpeg;base64," + base64.b64encode(output.getvalue()).decode("ascii")
 
 
-def layout_location(pdf, number: int):
-    for page_index, page in enumerate(pdf.pages[:-1]):
-        halves = ((0, 0, page.width / 2, page.height), (page.width / 2, 0, page.width, page.height))
-        for half in halves:
-            if any(candidate == number for candidate, _ in question_positions(page, half)):
-                return page_index, half
-    return None
-
-
-def record_for(year: int, round_number: int, source: str, number: int, parsed, answer, void, image_data):
+def record_for(year: int, round_code: str, source: str, number: int, parsed, answer, void, image_data):
     subject = SUBJECTS[min((number - 1) // 20, 4)]
     if parsed:
         stem, options = parsed
@@ -131,13 +163,14 @@ def record_for(year: int, round_number: int, source: str, number: int, parsed, a
         stem = f"원문 이미지의 {number}번 문항을 보고 답하세요."
         options = ["①", "②", "③", "④"]
     is_void = void or answer is None
-    layout = {"kind": "image", "imageData": image_data, "alt": f"{year}년 {round_number}회 {number}번 원문"} if image_data else {"kind": "text"}
-    digest = hashlib.sha1(f"{year}-{round_number}-{number}-{source}".encode("utf-8")).hexdigest()[:10]
+    label = round_label(year, round_code)
+    layout = {"kind": "image", "imageData": image_data, "alt": f"{label} {number}번 원문"} if image_data else {"kind": "text"}
+    digest = hashlib.sha1(f"{year}-{round_code}-{number}-{source}".encode("utf-8")).hexdigest()[:10]
     return {
-        "id": f"PAST-{year}-{round_number}-{number:03d}-{digest}",
+        "id": f"PAST-{year}-{round_code}-{number:03d}-{digest}",
         "examName": "정보처리기사 필기",
         "year": year,
-        "round": f"{year}년 {round_number}회",
+        "round": label,
         "subject": subject,
         "unit": "기출문제",
         "learningObjective": "실제 기출문항 풀이",
@@ -159,14 +192,17 @@ def record_for(year: int, round_number: int, source: str, number: int, parsed, a
     }
 
 
-def build_pdf(path: Path, year: int, round_number: int):
+def build_pdf(path: Path, year: int, round_code: str):
     with pdfplumber.open(path) as pdf:
         answers, voids = answer_map(pdf, path)
         parsed_by_number = {}
         location_by_number = {}
+        segments = []
         for page_index, page in enumerate(pdf.pages[:-1]):
             halves = ((0, 0, page.width / 2, page.height), (page.width / 2, 0, page.width, page.height))
             for half in halves:
+                positions = question_positions(page, half)
+                segments.append((page_index, page, half, positions))
                 text = page.crop(half).extract_text(x_tolerance=2, y_tolerance=3) or ""
                 for number, body in split_blocks(text):
                     if 1 <= number <= 100:
@@ -179,14 +215,17 @@ def build_pdf(path: Path, year: int, round_number: int):
         for number in range(1, 101):
             parsed = parsed_by_number.get(number)
             needs_image = parsed is None or any(hint.lower() in (parsed[0].lower() if parsed else "") for hint in LAYOUT_HINTS)
-            location = location_by_number.get(number) or layout_location(pdf, number)
-            image_data = image_for(pdf.pages[location[0]], location[1], number) if needs_image and location else None
+            location = location_by_number.get(number)
+            if location is None:
+                location = next(((page_index, half) for page_index, _, half, positions in segments if any(candidate == number for candidate, _ in positions)), None)
+            image_data = image_for_question(segments, number, location) if needs_image and location else None
             if image_data:
                 image_count += 1
-            questions.append(record_for(year, round_number, path.name, number, parsed, answers.get(number), number in voids, image_data))
+            questions.append(record_for(year, round_code, path.name, number, parsed, answers.get(number), number in voids, image_data))
         return questions, {
             "year": year,
-            "round": round_number,
+            "round": round_label(year, round_code),
+            "roundCode": round_code,
             "source": path.name,
             "questions": len(questions),
             "parsed": len(parsed_by_number),
@@ -199,35 +238,37 @@ def build_pdf(path: Path, year: int, round_number: int):
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=Path("private-source/jeongbo-2021-2025-private-pack.json"))
+    parser.add_argument("--output", type=Path, default=Path("private-source/jeongbo-2020-2025-private-pack.json"))
     args = parser.parse_args()
     manifest_path = args.source_root / "_generated" / "source-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     selected = []
     for source in manifest["records"]:
         year = source.get("year")
-        round_number = source_round(source["source_file"])
-        if year in YEARS and round_number and source.get("category") == "기출" and source.get("page_count", 0) <= 15:
-            selected.append((year, round_number, args.source_root / source["relative_path"]))
-    selected.sort(key=lambda row: (row[0], row[1]))
-    if len(selected) != 15 or len({(year, round_number) for year, round_number, _ in selected}) != 15:
-        raise SystemExit(f"2021-2025 15회분을 찾지 못했습니다: {[(y, r) for y, r, _ in selected]}")
+        round_code = source_round(source["source_file"], year) if year else None
+        if year in YEARS and round_code and source.get("category") == "기출" and source.get("page_count", 0) <= 15:
+            selected.append((year, round_code, args.source_root / source["relative_path"]))
+    round_order = {"1": 1, "1-2": 1, "2": 2, "3": 3, "4": 4}
+    selected.sort(key=lambda row: (row[0], round_order[row[1]]))
+    if len(selected) != 18 or len({(year, round_code) for year, round_code, _ in selected}) != 18:
+        raise SystemExit(f"2020-2025 18회분을 찾지 못했습니다: {[(y, r) for y, r, _ in selected]}")
     questions = []
     reports = []
-    for year, round_number, path in selected:
-        rows, report = build_pdf(path, year, round_number)
+    for year, round_code, path in selected:
+        rows, report = build_pdf(path, year, round_code)
         questions.extend(rows)
         reports.append(report)
         print(json.dumps(report, ensure_ascii=False), flush=True)
     ids = [question["id"] for question in questions]
-    if len(questions) != 1500 or len(set(ids)) != 1500:
+    if len(questions) != 1800 or len(set(ids)) != 1800:
         raise SystemExit(f"문항 수/ID 검증 실패: questions={len(questions)}, unique={len(set(ids))}")
-    for year, round_number, _ in selected:
-        rows = [question for question in questions if question["year"] == year and question["round"] == f"{year}년 {round_number}회"]
+    for year, round_code, _ in selected:
+        label = round_label(year, round_code)
+        rows = [question for question in questions if question["year"] == year and question["round"] == label]
         numbers = {question["sourceQuestionNumber"] for question in rows}
         subject_counts = {subject: sum(question["subject"] == subject for question in rows) for subject in SUBJECTS}
         if len(rows) != 100 or numbers != set(range(1, 101)) or set(subject_counts.values()) != {20}:
-            raise SystemExit(f"회차 구성 검증 실패: {year}-{round_number}, rows={len(rows)}, subjects={subject_counts}")
+            raise SystemExit(f"회차 구성 검증 실패: {label}, rows={len(rows)}, subjects={subject_counts}")
     malformed = [question["id"] for question in questions if len(question["options"]) != 4 or not question["stem"] or not question["answer"] or any(answer not in range(4) for answer in question["answer"])]
     if malformed:
         raise SystemExit(f"문항 구조 검증 실패: {malformed[:20]}")
@@ -236,12 +277,12 @@ def main() -> int:
         raise SystemExit(f"원문 이미지 연결 실패: {unresolved}")
     pack = {
         "meta": {
-            "format": "jeongbo-private-pack-v1",
-            "title": "정보처리기사 2021-2025 기출 15회",
+            "format": "jeongbo-private-pack-v2",
+            "title": "정보처리기사 2020-2025 기출 18회",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "copyright": "개인 이용 전용 - 공개 저장소 및 다른 매체에 배포 금지",
-            "setCount": 15,
-            "questionCount": 1500,
+            "setCount": 18,
+            "questionCount": 1800,
             "years": list(YEARS),
             "reports": reports,
         },
@@ -249,7 +290,7 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(pack, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
-    print(json.dumps({"output": str(args.output.resolve()), "sets": 15, "questions": 1500, "bytes": args.output.stat().st_size}, ensure_ascii=False))
+    print(json.dumps({"output": str(args.output.resolve()), "sets": 18, "questions": 1800, "bytes": args.output.stat().st_size}, ensure_ascii=False))
     return 0
 
 
