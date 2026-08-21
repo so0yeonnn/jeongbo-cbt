@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="description" content="정보처리기사 필기 모바일 CBT - 개인용 기출팩 학습">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="app.css?v=20260821d">
+  <link rel="stylesheet" href="app.css?v=20260821e">
   <title>정보처리기사 CBT</title>
 </head>
 <body>
@@ -20,11 +20,18 @@
       <div class="hero compact">
         <p class="kicker">2020~2025년 · 18회 · 1,800문항</p>
         <h2>오늘 풀 문제를<br>직접 고르세요.</h2>
-        <p>공개 페이지에는 문제 원문을 넣지 않습니다. 개인용 기출팩을 한 번 불러오면 이 휴대폰에만 저장되고 이후 바로 풀 수 있습니다.</p>
+        <p>공개 페이지에는 문제 원문을 넣지 않습니다. 개인 Google Drive에 연결하면 기출팩과 진도를 휴대폰·컴퓨터에서 이어서 사용할 수 있습니다.</p>
       </div>
 
+      <section class="picker-card drive-card">
+        <div class="section-title"><h3>Google Drive 동기화</h3><span id="drive-badge">연결 안 됨</span></div>
+        <p class="pack-summary">기출팩·진도·오답을 본인 계정의 숨겨진 앱 전용 공간에 저장합니다. 다른 Drive 파일은 볼 수 없습니다.</p>
+        <div class="drive-actions"><button id="drive-connect" class="primary">Google Drive 연결</button><button id="drive-sync-now" class="secondary hidden">지금 동기화</button></div>
+        <p id="drive-status" class="status" aria-live="polite"></p>
+      </section>
+
       <section class="picker-card import-card">
-        <div class="section-title"><h3>개인용 기출팩</h3><span>기기 내부 저장</span></div>
+        <div class="section-title"><h3>개인용 기출팩</h3><span>기기 + 비공개 Drive</span></div>
         <p id="pack-summary" class="pack-summary">아직 기출팩을 불러오지 않았습니다.</p>
         <input id="private-pack-input" class="sr-only" type="file" accept="application/json,.json">
         <label class="primary import-button" for="private-pack-input">기출팩 불러오기</label>
@@ -116,7 +123,9 @@
   </main>
 
   <dialog id="finish-dialog"><h2>시험을 종료할까요?</h2><p id="finish-dialog-text"></p><div class="dialog-actions"><button id="cancel-finish" class="secondary">계속 풀기</button><button id="confirm-finish" class="primary">채점하기</button></div></dialog>
-  <script src="logic.js?v=20260821d"></script>
-  <script src="app.js?v=20260821d"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="logic.js?v=20260821e"></script>
+  <script src="drive-sync.js?v=20260821e"></script>
+  <script src="app.js?v=20260821e"></script>
 </body>
 </html>

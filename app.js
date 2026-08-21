@@ -3,6 +3,7 @@
 const SESSION_KEY='jeongbo-cbt-session-v2';
 const WRONG_KEY='jeongbo-cbt-wrongs-v2';
 const RESULT_KEY='jeongbo-cbt-results-v2';
+const PROGRESS_UPDATED_KEY='jeongbo-cbt-progress-updated-v2';
 const PACK_DB='jeongbo-private-pack-v2';
 const PACK_STORE='packs';
 let questionBank=[];
@@ -25,12 +26,40 @@ let flags=[];
 let current=0;
 let remaining=0;
 let timerId=null;
+let suppressProgressSync=false;
 
 function readJson(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}}
-function writeJson(key,value){localStorage.setItem(key,JSON.stringify(value));}
+function writeJson(key,value){
+  localStorage.setItem(key,JSON.stringify(value));
+  if(!suppressProgressSync&&[SESSION_KEY,WRONG_KEY,RESULT_KEY].includes(key)){
+    localStorage.setItem(PROGRESS_UPDATED_KEY,new Date().toISOString());
+    globalThis.DriveSync?.queueProgress();
+  }
+}
 function getWrongRecords(){return readJson(WRONG_KEY,{version:1,records:{}});}
 function saveWrongRecords(value){writeJson(WRONG_KEY,value);}
 function activeWrongs(){const all=getWrongRecords().records;return Object.values(all).filter(row=>row.active).sort((a,b)=>(b.wrongCount||0)-(a.wrongCount||0));}
+
+function progressSnapshot(){
+  return {
+    version:2,
+    updatedAt:localStorage.getItem(PROGRESS_UPDATED_KEY)||new Date(0).toISOString(),
+    session:readJson(SESSION_KEY,null),
+    wrongs:readJson(WRONG_KEY,{version:1,records:{}}),
+    results:readJson(RESULT_KEY,[])
+  };
+}
+
+function applyProgressSnapshot(snapshot){
+  if(snapshot?.version!==2)throw new Error('Drive 진도 파일 형식이 올바르지 않습니다.');
+  suppressProgressSync=true;
+  try{
+    [[SESSION_KEY,snapshot.session],[WRONG_KEY,snapshot.wrongs],[RESULT_KEY,snapshot.results]].forEach(([key,value])=>{
+      if(value==null)localStorage.removeItem(key);else localStorage.setItem(key,JSON.stringify(value));
+    });
+    localStorage.setItem(PROGRESS_UPDATED_KEY,snapshot.updatedAt||new Date().toISOString());
+  }finally{suppressProgressSync=false;}
+}
 
 function openPackDb(){
   return new Promise((resolve,reject)=>{
@@ -134,7 +163,7 @@ function renderInstantFeedback(q){
   box.innerHTML=`<div class="feedback-title"><strong>${correct?'정답입니다':'다시 확인해 보세요'}</strong><span>정답 ${esc(answer)}</span></div><p><strong>해설</strong><br>${esc(q.explanation)}</p>${reasons}${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}`;
 }
 
-function saveSession(){writeJson(SESSION_KEY,{exam,examName,examMode,solveMode,answers,flags,current,remaining});}
+function saveSession(){writeJson(SESSION_KEY,{examIds:exam.map(q=>q.id),examName,examMode,solveMode,answers,flags,current,remaining});}
 function showOverview(){
   show('overview-screen');
   const answered=answers.filter(row=>row.length).length;
@@ -198,6 +227,7 @@ $('private-pack-input').onchange=async event=>{
     const pack=JSON.parse(await file.text()); validatePack(pack); await writePack(pack);
     questionBank=pack.questions; packMeta=pack.meta; localStorage.removeItem(SESSION_KEY);
     $('pack-status').textContent='18회·1,800문항 기출팩을 이 기기에 저장했습니다.'; renderStart();
+    globalThis.DriveSync?.uploadPack().catch(error=>setDriveStatus(error.message,'bad'));
   }catch(error){$('pack-status').textContent=`불러오기 실패: ${error.message}`;}
   event.target.value='';
 };
@@ -223,7 +253,12 @@ $('custom-start').onclick=()=>{
   $('filter-status').textContent=''; startExam(shuffle(candidates).slice(0,count),'맞춤 문제',null,'regular',selectedSolveMode());
 };
 $('wrong-start').onclick=()=>{const rows=activeWrongs();const items=rows.map(row=>{const full=questionBank.find(q=>q.id===row.id)||row.question;return full?{...full,wrongCount:row.wrongCount}:null;}).filter(Boolean);startExam(items,'오답 재시험',null,'wrong-review',selectedSolveMode());};
-$('resume-button').onclick=()=>{const saved=readJson(SESSION_KEY,null);if(saved)startExam(saved.exam,saved.examName,saved,saved.examMode,saved.solveMode);};
+$('resume-button').onclick=()=>{
+  const saved=readJson(SESSION_KEY,null);if(!saved)return;
+  const items=saved.examIds?saved.examIds.map(id=>questionBank.find(q=>q.id===id)).filter(Boolean):saved.exam;
+  if(!items?.length){$('pack-status').textContent='이어 풀 문제를 찾지 못했습니다. 기출팩을 먼저 동기화해 주세요.';return;}
+  startExam(items,saved.examName,saved,saved.examMode,saved.solveMode);
+};
 $('prev-button').onclick=()=>{if(current>0){current-=1;renderQuestion();saveSession();window.scrollTo(0,0);}};
 $('next-button').onclick=()=>{if(current<exam.length-1){current+=1;renderQuestion();saveSession();window.scrollTo(0,0);}else showOverview();};
 $('flag-button').onclick=()=>{flags[current]=!flags[current];renderQuestion();saveSession();};
@@ -235,6 +270,27 @@ $('reset-button').onclick=renderStart;
 $('copy-button').onclick=async()=>{await navigator.clipboard.writeText(exportText());$('export-status').textContent='결과를 복사했습니다.';};
 $('share-button').onclick=async()=>{const text=exportText();if(navigator.share)await navigator.share({title:'정보처리기사 CBT 결과',text});else{await navigator.clipboard.writeText(text);$('export-status').textContent='공유 기능 대신 결과를 복사했습니다.';}};
 $('download-button').onclick=()=>{const blob=new Blob([exportText()],{type:'text/markdown;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='정보처리기사-CBT-결과.md';a.click();URL.revokeObjectURL(a.href);};
+
+function setDriveStatus(message,tone=''){$('drive-status').textContent=message;$('drive-status').className=`status ${tone}`.trim();}
+function setDriveConnection(connected){
+  $('drive-badge').textContent=connected?'연결됨':'연결 안 됨';
+  $('drive-badge').classList.toggle('connected',connected);
+  $('drive-connect').textContent=connected?'Google 계정 다시 연결':'Google Drive 연결';
+  $('drive-sync-now').classList.toggle('hidden',!connected);
+}
+
+globalThis.DriveSync.configure({
+  getPack:readPack,
+  setPack:async pack=>{validatePack(pack);await writePack(pack);questionBank=pack.questions;packMeta=pack.meta;},
+  getProgress:progressSnapshot,
+  setProgress:applyProgressSnapshot,
+  onStatus:setDriveStatus,
+  onConnection:setDriveConnection,
+  onBusy:busy=>{$('drive-connect').disabled=busy;$('drive-sync-now').disabled=busy;},
+  onSynced:()=>renderStart()
+});
+$('drive-connect').onclick=()=>globalThis.DriveSync.connect().catch(()=>{});
+$('drive-sync-now').onclick=()=>globalThis.DriveSync.syncNow().catch(()=>{});
 
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 async function initialize(){

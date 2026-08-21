@@ -15,7 +15,10 @@ if(row.active||row.wrongCount!==2||row.history.length!==3)throw new Error('corre
 if(logic.updateWrongRecord(null,q,q.answer,true,'2026-08-21T00:03:00Z')!==null)throw new Error('correct-only record');
 if(fs.existsSync('bank.js')||fs.existsSync('question-bank.json'))throw new Error('public question data must not exist');
 const html=fs.readFileSync('index.html','utf8');
-if(!html.includes('private-pack-input')||html.includes('bank.js'))throw new Error('private pack importer');
+if(!html.includes('private-pack-input')||!html.includes('drive-connect')||html.includes('bank.js'))throw new Error('private pack importer and Drive sync UI');
 const app=fs.readFileSync('app.js','utf8');
 if(!app.includes("jeongbo-private-pack-v2")||!app.includes('questions.length!==1800')||!app.includes('sets.size!==18'))throw new Error('2020-2025 pack validation');
-console.log(JSON.stringify({publicQuestions:0,wrongCount:row.wrongCount,active:row.active,history:row.history.length}));
+const drive=fs.readFileSync('drive-sync.js','utf8');
+if(!drive.includes('https://www.googleapis.com/auth/drive.appdata')||!drive.includes("parents:['appDataFolder']"))throw new Error('private Drive appDataFolder sync');
+if(/client_secret/i.test(drive))throw new Error('client secret must not be published');
+console.log(JSON.stringify({publicQuestions:0,wrongCount:row.wrongCount,active:row.active,history:row.history.length,driveScope:'appdata'}));

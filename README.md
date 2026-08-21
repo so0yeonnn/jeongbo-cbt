@@ -6,7 +6,8 @@
 
 - 예상문제는 앱과 저장소에 포함하지 않습니다.
 - 출판사 저작권 안내가 있는 기출 원문은 GitHub 저장소와 Pages 배포물에 포함하지 않습니다.
-- 개인용 기출팩은 사용자가 파일 선택기로 불러오며 IndexedDB에 기기 내부 저장됩니다.
+- 개인용 기출팩은 사용자가 파일 선택기로 불러오며 IndexedDB와 본인 Google Drive의 숨겨진 앱 전용 공간에 저장됩니다.
+- Drive OAuth 권한은 `drive.appdata` 하나만 사용하며 일반 Drive 파일에는 접근하지 않습니다.
 - 기출팩은 2020~2025년 18회, 1,800문항을 가져야 앱에서 승인됩니다.
 
 ## 빌드
@@ -20,7 +21,7 @@ python tools/build_private_exam_pack.py --source-root "<private-source 경로>"
 ## 로컬 실행
 
 ```powershell
-python -m http.server 4173
+node tools/dev_server.mjs
 ```
 
 브라우저에서 `http://localhost:4173`을 엽니다. GitHub Pages에서는 정적 파일만으로 동작합니다.
@@ -31,5 +32,6 @@ python -m http.server 4173
 - 진행 상태: `jeongbo-cbt-session-v2`
 - 오답 기록: `jeongbo-cbt-wrongs-v2`
 - 응시 결과: `jeongbo-cbt-results-v2`
+- Drive 비공개 동기화: `jeongbo-private-pack-v2.json`, `jeongbo-progress-v2.json` (`appDataFolder`)
 
 오답은 문항 고유 ID를 키로 저장하므로 중복 생성되지 않습니다. 다시 틀리면 횟수가 증가하고, 맞히면 활성 목록에서 제외되지만 이력은 유지됩니다.
