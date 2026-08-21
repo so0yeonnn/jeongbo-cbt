@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="description" content="정보처리기사 필기 모바일 CBT - 저작권 안전 독자 예상문제">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="app.css?v=20260821">
+  <link rel="stylesheet" href="app.css?v=20260821b">
   <title>정보처리기사 CBT</title>
 </head>
 <body>
@@ -23,6 +23,33 @@
         <p>제공 자료 전체의 출제 개념과 유형을 분석해 새로 작성한 공개용 문제은행입니다. 출판사 원문 문제와 해설은 포함하지 않습니다.</p>
       </div>
 
+      <section class="picker-card mode-card">
+        <div class="section-title"><h3>풀이 방법</h3><span>먼저 선택</span></div>
+        <div class="mode-picker" role="radiogroup" aria-label="풀이 방법">
+          <label class="mode-option">
+            <input type="radio" name="solve-mode" value="study" checked>
+            <span class="mode-icon">📖</span>
+            <span><strong>해설 보며 풀기</strong><small>답을 고르면 바로 정답과 선지별 해설을 확인합니다.</small></span>
+          </label>
+          <label class="mode-option">
+            <input type="radio" name="solve-mode" value="exam">
+            <span class="mode-icon">⏱️</span>
+            <span><strong>실전 시험처럼</strong><small>제출 전까지 정답과 해설을 숨기고 시간을 측정합니다.</small></span>
+          </label>
+        </div>
+      </section>
+
+      <section class="picker-card subject-card">
+        <div class="section-title"><h3>과목 선택</h3><span>복수 선택 가능</span></div>
+        <div id="subject-picker" class="chapter-picker"></div>
+        <div class="picker-actions"><button id="select-all-subjects" class="ghost compact-button">전체 선택</button><button id="clear-subjects" class="ghost compact-button">선택 해제</button></div>
+        <label class="select-row" for="subject-question-count">문제 수
+          <select id="subject-question-count"><option value="10">10문제</option><option value="20" selected>20문제</option><option value="40">40문제</option><option value="100">100문제</option></select>
+        </label>
+        <button id="subject-start" class="primary wide">선택한 과목 풀기</button>
+        <p id="subject-status" class="status"></p>
+      </section>
+
       <section class="picker-card">
         <div class="section-title"><h3>회차별 모의고사</h3><span id="set-count-label"></span></div>
         <div id="set-grid" class="set-grid"></div>
@@ -30,8 +57,8 @@
       </section>
 
       <section class="picker-card">
-        <div class="section-title"><h3>내가 골라 풀기</h3><span>필터 조합</span></div>
-        <div class="filter-label">과목</div><div id="subject-picker" class="chapter-picker"></div>
+        <div class="section-title"><h3>세부 조건 골라 풀기</h3><span>연도·유형 필터</span></div>
+        <p class="source-note">위에서 고른 과목에 연도와 문제 유형 조건을 추가합니다.</p>
         <div class="filter-label">연도</div><div id="year-picker" class="chapter-picker"></div>
         <div class="filter-label">문제 유형</div><div id="type-picker" class="chapter-picker"></div>
         <label class="select-row" for="question-count">문제 수
@@ -51,10 +78,11 @@
       <div class="progress-row"><span id="question-number"></span><span id="answered-count"></span></div>
       <div class="progress"><div id="progress-fill"></div></div>
       <article class="question-card">
-        <div class="meta"><span id="exam-name"></span><span id="subject"></span><span id="unit"></span><span id="difficulty"></span></div>
+        <div class="meta"><span id="solve-mode-badge"></span><span id="exam-name"></span><span id="subject"></span><span id="unit"></span><span id="difficulty"></span></div>
         <h2 id="question-text"></h2>
         <div id="question-layout" class="question-detail hidden"></div>
         <fieldset id="options"><legend class="sr-only">답안 선택</legend></fieldset>
+        <div id="instant-feedback" class="instant-feedback hidden" aria-live="polite"></div>
       </article>
       <nav class="question-nav"><button id="prev-button" class="secondary">이전</button><button id="flag-button" class="ghost">검토</button><button id="next-button" class="primary">다음</button></nav>
       <button id="open-overview" class="overview-button">문항 전체 보기</button>
@@ -76,8 +104,8 @@
   </main>
 
   <dialog id="finish-dialog"><h2>시험을 종료할까요?</h2><p id="finish-dialog-text"></p><div class="dialog-actions"><button id="cancel-finish" class="secondary">계속 풀기</button><button id="confirm-finish" class="primary">채점하기</button></div></dialog>
-  <script src="bank.js?v=20260821"></script>
-  <script src="logic.js?v=20260821"></script>
-  <script src="app.js?v=20260821"></script>
+  <script src="bank.js?v=20260821b"></script>
+  <script src="logic.js?v=20260821b"></script>
+  <script src="app.js?v=20260821b"></script>
 </body>
 </html>
