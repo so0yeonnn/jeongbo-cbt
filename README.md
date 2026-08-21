@@ -1,21 +1,21 @@
 # 정보처리기사 CBT
 
-모바일에서 사용하는 정보처리기사 필기 PWA 문제은행입니다. 기존 ISTQB 모바일 앱의 화면 구조, 시험 진행, 자동 채점, 오답 누적·재시험, localStorage 저장, 결과 공유 구조를 재사용했습니다.
+모바일에서 사용하는 정보처리기사 필기 PWA 문제은행입니다. 2021~2025년 기출 15회분을 개인용 기출팩으로 불러와 사용합니다.
 
-## 공개 데이터 정책
+## 데이터 정책
 
-- 첨부 PDF 2개(267쪽)는 전체 페이지를 읽기 전용으로 분석했습니다.
-- 출판사 저작권 안내가 있는 원문·선지·해설·그림은 저장소에 포함하지 않습니다.
-- 공개 `question-bank.json`은 개념과 유형 통계만 참고해 독립적으로 작성한 예상문제입니다.
-- 출제 범위는 Q-Net 정보처리기사 종목별 출제기준의 5과목 체계를 기준으로 정규화했습니다.
+- 예상문제는 앱과 저장소에 포함하지 않습니다.
+- 출판사 저작권 안내가 있는 기출 원문은 GitHub 저장소와 Pages 배포물에 포함하지 않습니다.
+- 개인용 기출팩은 사용자가 파일 선택기로 불러오며 IndexedDB에 기기 내부 저장됩니다.
+- 기출팩은 2021~2025년 15회, 1,500문항을 가져야 앱에서 승인됩니다.
 
 ## 빌드
 
 ```powershell
-python tools/build_public_bank.py
+python tools/build_private_exam_pack.py --source-root "<private-source 경로>"
 ```
 
-생성 결과는 `bank.js`, `question-bank.json`, `reports/public-bank-report.json`입니다. 정답 위치와 데이터 누락·중복은 빌드에서 검증합니다.
+생성 결과는 Git에서 제외된 `private-source/jeongbo-2021-2025-private-pack.json`입니다. 15회·1,500문항, 고유 ID, 원문 이미지 연결을 빌드에서 검증합니다.
 
 ## 로컬 실행
 
@@ -27,8 +27,9 @@ python -m http.server 4173
 
 ## 저장 구조
 
-- 진행 상태: `jeongbo-cbt-session-v1`
-- 오답 기록: `jeongbo-cbt-wrongs-v1`
-- 응시 결과: `jeongbo-cbt-results-v1`
+- 개인용 기출팩: IndexedDB `jeongbo-private-pack-v1`
+- 진행 상태: `jeongbo-cbt-session-v2`
+- 오답 기록: `jeongbo-cbt-wrongs-v2`
+- 응시 결과: `jeongbo-cbt-results-v2`
 
 오답은 문항 고유 ID를 키로 저장하므로 중복 생성되지 않습니다. 다시 틀리면 횟수가 증가하고, 맞히면 활성 목록에서 제외되지만 이력은 유지됩니다.

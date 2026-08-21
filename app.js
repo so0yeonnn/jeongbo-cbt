@@ -1,16 +1,19 @@
 'use strict';
 
-const SESSION_KEY='jeongbo-cbt-session-v1';
-const WRONG_KEY='jeongbo-cbt-wrongs-v1';
-const RESULT_KEY='jeongbo-cbt-results-v1';
-const questionBank=globalThis.QUESTION_BANK||[];
-const meta=globalThis.CBT_META||{};
+const SESSION_KEY='jeongbo-cbt-session-v2';
+const WRONG_KEY='jeongbo-cbt-wrongs-v2';
+const RESULT_KEY='jeongbo-cbt-results-v2';
+const PACK_DB='jeongbo-private-pack-v1';
+const PACK_STORE='packs';
+let questionBank=[];
+let packMeta=null;
 const letters=['A','B','C','D'];
 const $=id=>document.getElementById(id);
 const screens=['start-screen','quiz-screen','overview-screen','result-screen'];
 const show=id=>screens.forEach(name=>$(name).classList.toggle('active',name===id));
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const same=globalThis.CBT_LOGIC.sameAnswers;
+const isCorrect=(q,answer)=>Boolean(q?.void)||(q?.acceptAny?answer?.length===1&&q.answer.includes(answer[0]):same(q.answer,answer));
 const shuffle=items=>{const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;};
 
 let exam=[];
@@ -29,17 +32,42 @@ function getWrongRecords(){return readJson(WRONG_KEY,{version:1,records:{}});}
 function saveWrongRecords(value){writeJson(WRONG_KEY,value);}
 function activeWrongs(){const all=getWrongRecords().records;return Object.values(all).filter(row=>row.active).sort((a,b)=>(b.wrongCount||0)-(a.wrongCount||0));}
 
+function openPackDb(){
+  return new Promise((resolve,reject)=>{
+    const request=indexedDB.open(PACK_DB,1);
+    request.onupgradeneeded=()=>request.result.createObjectStore(PACK_STORE);
+    request.onsuccess=()=>resolve(request.result);
+    request.onerror=()=>reject(request.error);
+  });
+}
+async function readPack(){const db=await openPackDb();return new Promise((resolve,reject)=>{const request=db.transaction(PACK_STORE).objectStore(PACK_STORE).get('active');request.onsuccess=()=>resolve(request.result||null);request.onerror=()=>reject(request.error);});}
+async function writePack(pack){const db=await openPackDb();return new Promise((resolve,reject)=>{const request=db.transaction(PACK_STORE,'readwrite').objectStore(PACK_STORE).put(pack,'active');request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error);});}
+async function deletePack(){const db=await openPackDb();return new Promise((resolve,reject)=>{const request=db.transaction(PACK_STORE,'readwrite').objectStore(PACK_STORE).delete('active');request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error);});}
+
+function validatePack(pack){
+  if(pack?.meta?.format!=='jeongbo-private-pack-v1'||!Array.isArray(pack.questions))throw new Error('정보처리기사 개인용 기출팩 형식이 아닙니다.');
+  const sets=new Set(pack.questions.map(q=>q.round));
+  if(pack.questions.length!==1500||sets.size!==15)throw new Error(`15회·1,500문항 기출팩이 아닙니다. (${sets.size}회·${pack.questions.length}문항)`);
+  if(pack.questions.some(q=>!q.id||!q.stem||q.options?.length!==4||!q.year||!q.round))throw new Error('필수 문항 정보가 누락된 기출팩입니다.');
+  return true;
+}
+
 function checkboxGroup(id,values,formatter=x=>x){
   $(id).innerHTML=values.map((value,index)=>`<label class="chapter-check"><input type="checkbox" value="${esc(value)}" checked><span>${esc(formatter(value,index))}</span></label>`).join('');
 }
 
 function renderStart(){
   clearInterval(timerId); $('timer').textContent='--:--'; show('start-screen');
+  const loaded=questionBank.length>0;
+  $('bank-controls').classList.toggle('hidden',!loaded);
+  $('clear-pack').classList.toggle('hidden',!loaded);
+  $('pack-summary').textContent=loaded?`${packMeta?.title||'개인용 기출팩'} · ${[...new Set(questionBank.map(q=>q.round))].length}회 · ${questionBank.length.toLocaleString('ko-KR')}문항`:'아직 기출팩을 불러오지 않았습니다.';
+  if(!loaded)return;
   const sets=[...new Set(questionBank.map(q=>q.round))];
   $('set-count-label').textContent=`${sets.length}회차`;
   $('set-grid').innerHTML=sets.map(round=>{
     const count=questionBank.filter(q=>q.round===round).length;
-    return `<button class="set-button curated" data-round="${esc(round)}">${esc(round)}<small>${count}문제 · 독자 작성</small></button>`;
+    return `<button class="set-button curated" data-round="${esc(round)}">${esc(round)}<small>${count}문제 · 기출</small></button>`;
   }).join('');
   document.querySelectorAll('[data-round]').forEach(button=>button.onclick=()=>{
     const round=button.dataset.round;
@@ -85,7 +113,8 @@ function renderQuestion(){
   $('exam-name').textContent=examName; $('subject').textContent=q.subject; $('unit').textContent=q.unit; $('difficulty').textContent=q.difficulty;
   $('question-text').textContent=q.stem;
   const layout=$('question-layout');
-  layout.classList.toggle('hidden',!q.layout?.html); layout.innerHTML=q.layout?.html||'';
+  const layoutHtml=q.layout?.kind==='image'&&q.layout.imageData?`<img class="private-question-image" src="${q.layout.imageData}" alt="${esc(q.layout.alt||'원문 문항 이미지')}">`:q.layout?.html||'';
+  layout.classList.toggle('hidden',!layoutHtml); layout.innerHTML=layoutHtml;
   $('options').innerHTML=q.options.map((option,index)=>`<div class="option"><input id="choice-${index}" type="radio" name="answer" value="${index}" ${answers[current]?.includes(index)?'checked':''}><label for="choice-${index}"><strong>${letters[index]}.</strong> ${esc(option)}</label></div>`).join('');
   $('options').querySelectorAll('input').forEach(input=>input.onchange=()=>{answers[current]=[Number(input.value)];$('answered-count').textContent=`응답 ${answers.filter(row=>row.length).length}`;renderInstantFeedback(q);saveSession();});
   renderInstantFeedback(q);
@@ -96,11 +125,13 @@ function renderQuestion(){
 function renderInstantFeedback(q){
   const box=$('instant-feedback');
   if(solveMode!=='study'||!answers[current]?.length){box.className='instant-feedback hidden';box.innerHTML='';return;}
-  const correct=same(q.answer,answers[current]);
+  if(q.void){box.className='instant-feedback';box.innerHTML='<div class="feedback-title"><strong>채점 제외 문항</strong></div><p>원본 정답표에서 정답을 하나로 확정할 수 없어 점수에는 반영하지 않습니다.</p>';return;}
+  const correct=isCorrect(q,answers[current]);
   const answer=q.answer.map(i=>`${letters[i]}. ${q.options[i]}`).join(', ');
-  const reasons=(q.optionReasons||[]).map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('');
+  const reasonRows=q.optionReasons||[]; const uniqueReasons=[...new Set(reasonRows)];
+  const reasons=uniqueReasons.length===1?`<p>${esc(uniqueReasons[0])}</p>`:`<ul class="option-reason-list">${reasonRows.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('')}</ul>`;
   box.className=`instant-feedback ${correct?'correct':'incorrect'}`;
-  box.innerHTML=`<div class="feedback-title"><strong>${correct?'정답입니다':'다시 확인해 보세요'}</strong><span>정답 ${esc(answer)}</span></div><p><strong>해설</strong><br>${esc(q.explanation)}</p><ul class="option-reason-list">${reasons}</ul>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}`;
+  box.innerHTML=`<div class="feedback-title"><strong>${correct?'정답입니다':'다시 확인해 보세요'}</strong><span>정답 ${esc(answer)}</span></div><p><strong>해설</strong><br>${esc(q.explanation)}</p>${reasons}${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}`;
 }
 
 function saveSession(){writeJson(SESSION_KEY,{exam,examName,examMode,solveMode,answers,flags,current,remaining});}
@@ -115,9 +146,11 @@ function showOverview(){
 function recordResults(){
   const store=getWrongRecords(); const now=new Date().toISOString();
   exam.forEach((q,index)=>{
-    const correct=same(q.answer,answers[index]);
+    if(q.void)return;
+    const correct=isCorrect(q,answers[index]);
     const previous=store.records[q.id]||null;
-    const updated=globalThis.CBT_LOGIC.updateWrongRecord(previous,q,answers[index]||[],correct,now);
+    const storedQuestion={...q,layout:q.layout?.kind==='image'?{kind:'imageRef'}:q.layout};
+    const updated=globalThis.CBT_LOGIC.updateWrongRecord(previous,storedQuestion,answers[index]||[],correct,now);
     if(updated)store.records[q.id]=updated;
   });
   saveWrongRecords(store);
@@ -125,16 +158,17 @@ function recordResults(){
 
 function finishExam(){
   clearInterval(timerId); localStorage.removeItem(SESSION_KEY); recordResults();
-  const correct=exam.filter((q,index)=>same(q.answer,answers[index])).length;
-  const pct=Math.round(correct/exam.length*100);
+  const scorable=exam.filter(q=>!q.void); const voidCount=exam.length-scorable.length;
+  const correct=exam.filter((q,index)=>!q.void&&isCorrect(q,answers[index])).length;
+  const pct=scorable.length?Math.round(correct/scorable.length*100):100;
   const result={at:new Date().toISOString(),name:examName,mode:examMode,solveMode,total:exam.length,correct,pct,questionIds:exam.map(q=>q.id)};
   const results=readJson(RESULT_KEY,[]); results.unshift(result); writeJson(RESULT_KEY,results.slice(0,100));
-  show('result-screen'); $('result-label').textContent=examName; $('result-title').textContent=`${correct} / ${exam.length} (${pct}%)`;
+  show('result-screen'); $('result-label').textContent=examName; $('result-title').textContent=`${correct} / ${scorable.length} (${pct}%)`;
   const methodLabel=solveMode==='study'?'해설 학습 모드':'실전 시험 모드';
-  $('result-summary').textContent=`${methodLabel} · ${examMode==='wrong-review'?'맞힌 문항은 활성 오답에서 제외했으며 전체 기록은 유지했습니다.':`새 오답 ${exam.length-correct}문항을 고유 ID 기준으로 누적했습니다.`}`;
+  $('result-summary').textContent=`${methodLabel} · ${examMode==='wrong-review'?'맞힌 문항은 활성 오답에서 제외했으며 전체 기록은 유지했습니다.':`새 오답 ${scorable.length-correct}문항을 고유 ID 기준으로 누적했습니다.`}${voidCount?` · 정답 불명확 ${voidCount}문항 채점 제외`:''}`;
   const subjects=[...new Set(exam.map(q=>q.subject))];
   $('subject-results').innerHTML=subjects.map(subject=>{
-    const rows=exam.map((q,index)=>({q,index})).filter(row=>row.q.subject===subject); const good=rows.filter(row=>same(row.q.answer,answers[row.index])).length; const rate=Math.round(good/rows.length*100);
+    const rows=exam.map((q,index)=>({q,index})).filter(row=>row.q.subject===subject&&!row.q.void); const good=rows.filter(row=>isCorrect(row.q,answers[row.index])).length; const rate=rows.length?Math.round(good/rows.length*100):100;
     return `<div class="chapter-row"><strong>${esc(subject)}</strong><span>${good}/${rows.length} · ${rate}%</span><div class="chapter-bar"><span style="width:${rate}%"></span></div></div>`;
   }).join('');
   $('answer-review').innerHTML=exam.map((q,index)=>renderReview(q,index)).join('');
@@ -142,18 +176,32 @@ function finishExam(){
 }
 
 function renderReview(q,index){
-  const correct=same(q.answer,answers[index]);
+  const correct=isCorrect(q,answers[index]);
   const selected=answers[index]?.length?answers[index].map(i=>`${letters[i]}. ${q.options[i]}`).join(', '):'미응답';
   const answer=q.answer.map(i=>`${letters[i]}. ${q.options[i]}`).join(', ');
-  const reasons=q.optionReasons.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('');
-  return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span><p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p><ul class="option-reason-list">${reasons}</ul><div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div><p><strong>관련 개념:</strong> ${esc(q.conceptDetail)}</p><p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p></article>`;
+  const reasonRows=q.optionReasons||[]; const uniqueReasons=[...new Set(reasonRows)];
+  const reasons=uniqueReasons.length===1?`<p>${esc(uniqueReasons[0])}</p>`:`<ul class="option-reason-list">${reasonRows.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('')}</ul>`;
+  if(q.void)return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">채점 제외 · ${esc(q.id)}</span><p>${esc(q.explanation)}</p></article>`;
+  return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span><p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p>${reasons}${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}${q.conceptDetail?`<p><strong>관련 개념:</strong> ${esc(q.conceptDetail)}</p>`:''}${q.judgmentRule?`<p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p>`:''}</article>`;
 }
 
 function exportText(){
-  const correct=exam.filter((q,index)=>same(q.answer,answers[index])).length;
-  const wrong=exam.map((q,index)=>({q,index})).filter(row=>!same(row.q.answer,answers[row.index]));
-  return `# 정보처리기사 CBT 결과\n\n- 시험: ${examName}\n- 풀이 방법: ${solveMode==='study'?'해설 보며 풀기':'실전 시험처럼'}\n- 점수: ${correct}/${exam.length} (${Math.round(correct/exam.length*100)}%)\n- 응시 시각: ${new Date().toLocaleString('ko-KR')}\n- 활성 오답: ${activeWrongs().length}문항\n\n## 오답 ID\n${wrong.map(row=>`- ${row.q.id} · ${row.q.subject} · ${row.q.unit}`).join('\n')||'- 없음'}`;
+  const scorable=exam.filter(q=>!q.void); const correct=exam.filter((q,index)=>!q.void&&isCorrect(q,answers[index])).length;
+  const wrong=exam.map((q,index)=>({q,index})).filter(row=>!row.q.void&&!isCorrect(row.q,answers[row.index]));
+  return `# 정보처리기사 CBT 결과\n\n- 시험: ${examName}\n- 풀이 방법: ${solveMode==='study'?'해설 보며 풀기':'실전 시험처럼'}\n- 점수: ${correct}/${scorable.length} (${scorable.length?Math.round(correct/scorable.length*100):100}%)\n- 응시 시각: ${new Date().toLocaleString('ko-KR')}\n- 활성 오답: ${activeWrongs().length}문항\n\n## 오답 ID\n${wrong.map(row=>`- ${row.q.id} · ${row.q.subject} · ${row.q.unit}`).join('\n')||'- 없음'}`;
 }
+
+$('private-pack-input').onchange=async event=>{
+  const file=event.target.files?.[0]; if(!file)return;
+  $('pack-status').textContent='기출팩을 확인하고 저장하는 중입니다…';
+  try{
+    const pack=JSON.parse(await file.text()); validatePack(pack); await writePack(pack);
+    questionBank=pack.questions; packMeta=pack.meta; localStorage.removeItem(SESSION_KEY);
+    $('pack-status').textContent='15회·1,500문항 기출팩을 이 기기에 저장했습니다.'; renderStart();
+  }catch(error){$('pack-status').textContent=`불러오기 실패: ${error.message}`;}
+  event.target.value='';
+};
+$('clear-pack').onclick=async()=>{await deletePack();questionBank=[];packMeta=null;localStorage.removeItem(SESSION_KEY);renderStart();$('pack-status').textContent='이 기기에서 기출팩을 삭제했습니다.';};
 
 $('select-all-subjects').onclick=()=>$('subject-picker').querySelectorAll('input').forEach(input=>input.checked=true);
 $('clear-subjects').onclick=()=>$('subject-picker').querySelectorAll('input').forEach(input=>input.checked=false);
@@ -174,7 +222,7 @@ $('custom-start').onclick=()=>{
   if(!count){$('filter-status').textContent='과목·연도·유형을 하나 이상 선택하세요.';return;}
   $('filter-status').textContent=''; startExam(shuffle(candidates).slice(0,count),'맞춤 문제',null,'regular',selectedSolveMode());
 };
-$('wrong-start').onclick=()=>{const rows=activeWrongs();const items=rows.map(row=>({...row.question,wrongCount:row.wrongCount})).filter(Boolean);startExam(items,'오답 재시험',null,'wrong-review',selectedSolveMode());};
+$('wrong-start').onclick=()=>{const rows=activeWrongs();const items=rows.map(row=>{const full=questionBank.find(q=>q.id===row.id)||row.question;return full?{...full,wrongCount:row.wrongCount}:null;}).filter(Boolean);startExam(items,'오답 재시험',null,'wrong-review',selectedSolveMode());};
 $('resume-button').onclick=()=>{const saved=readJson(SESSION_KEY,null);if(saved)startExam(saved.exam,saved.examName,saved,saved.examMode,saved.solveMode);};
 $('prev-button').onclick=()=>{if(current>0){current-=1;renderQuestion();saveSession();window.scrollTo(0,0);}};
 $('next-button').onclick=()=>{if(current<exam.length-1){current+=1;renderQuestion();saveSession();window.scrollTo(0,0);}else showOverview();};
@@ -189,4 +237,9 @@ $('share-button').onclick=async()=>{const text=exportText();if(navigator.share)a
 $('download-button').onclick=()=>{const blob=new Blob([exportText()],{type:'text/markdown;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='정보처리기사-CBT-결과.md';a.click();URL.revokeObjectURL(a.href);};
 
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
-renderStart();
+async function initialize(){
+  try{const pack=await readPack();if(pack){validatePack(pack);questionBank=pack.questions;packMeta=pack.meta;}}
+  catch(error){$('pack-status').textContent=`저장된 기출팩을 읽지 못했습니다: ${error.message}`;}
+  renderStart();
+}
+initialize();

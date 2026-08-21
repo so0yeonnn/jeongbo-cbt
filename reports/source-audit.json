@@ -56,7 +56,7 @@
   "decision": {
     "publicOriginalQuestions": 0,
     "publicOriginalText": false,
-    "publicBankPolicy": "독자 예상문제만 배포",
+    "publicBankPolicy": "문항 데이터 미배포 - 개인용 기출팩만 기기 내부 사용",
     "manualReviewRequired": []
   }
 }

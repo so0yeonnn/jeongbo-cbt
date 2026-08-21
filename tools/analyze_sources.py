@@ -61,7 +61,7 @@ def main() -> None:
         "decision": {
             "publicOriginalQuestions": 0,
             "publicOriginalText": False,
-            "publicBankPolicy": "독자 예상문제만 배포",
+            "publicBankPolicy": "문항 데이터 미배포 - 개인용 기출팩만 기기 내부 사용",
             "manualReviewRequired": [row["fileName"] for row in rows if row["classification"] == "공개 권한 검수 필요"],
         },
     }
