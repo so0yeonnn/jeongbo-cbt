@@ -1,0 +1,62 @@
+{
+  "analyzedAt": "2026-08-21",
+  "sourceCount": 2,
+  "totalPages": 267,
+  "sources": [
+    {
+      "fileName": "1-기출.pdf.pdf",
+      "sha256": "083abf82b6efe1ca17f7e658e28ac4fb3b3ec60c096ca1305de0d3367ef8459c",
+      "format": "PDF",
+      "pages": 151,
+      "textCharacters": 302677,
+      "lowTextPages": [],
+      "pagesWithGraphics": 151,
+      "copyrightNoticePages": [
+        1,
+        8,
+        16,
+        24,
+        32,
+        40,
+        49,
+        57,
+        67,
+        75,
+        83,
+        91,
+        99,
+        112,
+        120,
+        128,
+        136,
+        144
+      ],
+      "officialMarkPages": [],
+      "classification": "공개 원문 사용 불가",
+      "publicHandling": "개념·유형 통계만 사용하고 원문·선지·해설·그림은 저장소에서 제외",
+      "privateHandling": "원본은 첨부 위치에서 읽기 전용 분석; 프로젝트와 Git에 복사하지 않음"
+    },
+    {
+      "fileName": "2-2026_정보처리기사필기_기출문제집_핵심요약.pdf",
+      "sha256": "4e2b17d16a399cbaf2770dd6400a3af36f53a539d685b21b0eb0be952d56a04c",
+      "format": "PDF",
+      "pages": 116,
+      "textCharacters": 225062,
+      "lowTextPages": [],
+      "pagesWithGraphics": 113,
+      "copyrightNoticePages": [
+        2
+      ],
+      "officialMarkPages": [],
+      "classification": "공개 원문 사용 불가",
+      "publicHandling": "개념·유형 통계만 사용하고 원문·선지·해설·그림은 저장소에서 제외",
+      "privateHandling": "원본은 첨부 위치에서 읽기 전용 분석; 프로젝트와 Git에 복사하지 않음"
+    }
+  ],
+  "decision": {
+    "publicOriginalQuestions": 0,
+    "publicOriginalText": false,
+    "publicBankPolicy": "독자 예상문제만 배포",
+    "manualReviewRequired": []
+  }
+}

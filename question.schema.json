@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "정보처리기사 CBT 문항",
+  "type": "object",
+  "required": ["id", "examName", "year", "round", "subject", "unit", "learningObjective", "difficulty", "type", "stem", "options", "answer", "explanation", "optionReasons", "sourceType", "layout"],
+  "properties": {
+    "id": {"type": "string"},
+    "examName": {"type": "string"},
+    "year": {"type": "integer"},
+    "round": {"type": "string"},
+    "subject": {"type": "string"},
+    "unit": {"type": "string"},
+    "learningObjective": {"type": "string"},
+    "criteria": {"type": "string"},
+    "difficulty": {"enum": ["하", "중", "상"]},
+    "type": {"type": "string"},
+    "stem": {"type": "string"},
+    "options": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "string"}},
+    "answer": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0, "maximum": 3}},
+    "explanation": {"type": "string"},
+    "optionReasons": {"type": "array", "minItems": 4, "maxItems": 4, "items": {"type": "string"}},
+    "sourceType": {"enum": ["공식 공개", "복원", "독자 예상"]},
+    "layout": {"type": "object"}
+  }
+}

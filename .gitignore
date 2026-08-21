@@ -1,0 +1,6 @@
+private-source/
+tmp/
+*.pdf
+*.zip
+reports/private-*
+.DS_Store

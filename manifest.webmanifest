@@ -1,0 +1,10 @@
+{
+  "name": "정보처리기사 CBT",
+  "short_name": "정보처리 CBT",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f8fb",
+  "theme_color": "#111827",
+  "lang": "ko",
+  "icons": []
+}
