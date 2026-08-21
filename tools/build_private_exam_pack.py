@@ -1,9 +1,10 @@
 """Build a personal-use 2020-2025 exam pack from supplied Sinagong PDFs.
 
 The generated pack is written below the ignored private-source directory and
-must never be committed or published. Text extraction is used where reliable;
-questions with figures, tables, code, or extraction failures retain a cropped
-image of the original layout.
+must never be committed or published. Text extraction is used where reliable.
+A private OCR recovery file supplies questions whose embedded PDF text is
+damaged. Figures may retain a focused crop, but a whole-question image is never
+used as a text substitute.
 """
 from __future__ import annotations
 
@@ -114,14 +115,14 @@ def render_segment(page, half, top: float, bottom: float):
     return crop.to_image(resolution=150).original.convert("RGB")
 
 
-def image_for_question(segments, number: int, location) -> str | None:
+def question_crops(segments, number: int, location):
     start_index = next((index for index, row in enumerate(segments) if row[0] == location[0] and row[2] == location[1]), None)
     if start_index is None:
-        return None
+        return []
     start_positions = segments[start_index][3]
     start_top = next((top for candidate, top in start_positions if candidate == number), None)
     if start_top is None:
-        return None
+        return []
     end_index = None
     end_top = None
     for index in range(start_index, len(segments)):
@@ -130,16 +131,20 @@ def image_for_question(segments, number: int, location) -> str | None:
             end_index, end_top = index, next_top
             break
     if end_index is None:
-        end_index = start_index
-        end_top = segments[start_index][1].height - 24
-    pieces = []
+        end_index = min(start_index + 1, len(segments) - 1)
+        end_top = segments[end_index][1].height - 24
+    crops = []
     for index in range(start_index, end_index + 1):
         _, page, half, _ = segments[index]
         top = start_top - 8 if index == start_index else 22
         bottom = end_top - 5 if index == end_index else page.height - 24
-        piece = render_segment(page, half, top, bottom)
-        if piece is not None:
-            pieces.append(piece)
+        if bottom > top + 16:
+            crops.append((page.crop((half[0], max(0, top), half[2], min(page.height, bottom))), half, top))
+    return crops
+
+
+def question_image(segments, number: int, location, resolution: int = 150) -> Image.Image | None:
+    pieces = [crop.to_image(resolution=resolution).original.convert("RGB") for crop, _, _ in question_crops(segments, number, location)]
     if not pieces:
         return None
     width = max(piece.width for piece in pieces)
@@ -150,13 +155,78 @@ def image_for_question(segments, number: int, location) -> str | None:
         for piece in pieces:
             image.paste(piece, (0, offset))
             offset += piece.height
+    return image
+
+
+def structured_text_for_question(segments, number: int, location):
+    """Recover a split question from positioned PDF words and skip distant banners."""
+    lines = []
+    y_offset = 0.0
+    for crop, half, top in question_crops(segments, number, location):
+        grouped = []
+        words = crop.extract_words(x_tolerance=2, y_tolerance=3) or []
+        for word in sorted(words, key=lambda row: (float(row["top"]), float(row["x0"]))):
+            y = float(word["top"]) - top
+            if not grouped or abs(grouped[-1]["y"] - y) > 2.5:
+                grouped.append({"y": y, "words": []})
+            grouped[-1]["words"].append((float(word["x0"]) - half[0], word["text"]))
+        for line in grouped:
+            lines.append({"y": y_offset + line["y"], "words": sorted(line["words"])})
+        y_offset += crop.height + 24
+    marker_rows = []
+    for line_index, line in enumerate(lines):
+        for word_index, (_, text) in enumerate(line["words"]):
+            if text in MARKS:
+                marker_rows.append((line_index, word_index, text))
+    if [row[2] for row in marker_rows[:4]] != list(MARKS):
+        return None
+    marker_rows = marker_rows[:4]
+    first_line, first_word, _ = marker_rows[0]
+    stem_parts = []
+    for line_index, line in enumerate(lines[: first_line + 1]):
+        end = first_word if line_index == first_line else len(line["words"])
+        texts = [text for _, text in line["words"][:end]]
+        if line_index == 0 and texts and re.fullmatch(rf"{number}[.)]", texts[0]):
+            texts = texts[1:]
+        joined = " ".join(texts)
+        if texts and not re.fullmatch(r"-?\s*\d+", joined):
+            stem_parts.append(joined)
+    options = []
+    for index, (line_index, word_index, _) in enumerate(marker_rows):
+        next_line = marker_rows[index + 1][0] if index + 1 < 4 else len(lines)
+        parts = []
+        previous_y = lines[line_index]["y"]
+        for candidate_index in range(line_index, next_line):
+            line = lines[candidate_index]
+            if candidate_index > line_index and line["y"] - previous_y > 18:
+                break
+            start = word_index + 1 if candidate_index == line_index else 0
+            texts = [text for _, text in line["words"][start:]]
+            joined = " ".join(texts)
+            if texts and not re.fullmatch(r"-?\s*\d+", joined):
+                parts.append(joined)
+                previous_y = line["y"]
+        options.append(clean(" ".join(parts)))
+    stem = clean(" ".join(stem_parts))
+    if len(stem) < 4 or any(not option for option in options):
+        return None
+    return stem, options
+
+
+def image_for_question(segments, number: int, location) -> str | None:
+    image = question_image(segments, number, location)
+    if image is None:
+        return None
     output = io.BytesIO()
     image.save(output, format="JPEG", quality=84, optimize=True)
     return "data:image/jpeg;base64," + base64.b64encode(output.getvalue()).decode("ascii")
 
 
-def record_for(year: int, round_code: str, source: str, number: int, parsed, answer, void, image_data):
+def record_for(year: int, round_code: str, source: str, number: int, parsed, answer, void, image_data, recovery=None):
     subject = SUBJECTS[min((number - 1) // 20, 4)]
+    recovery = recovery or {}
+    if recovery:
+        parsed = (recovery.get("stem", ""), recovery.get("options", []))
     if parsed:
         stem, options = parsed
     else:
@@ -164,7 +234,10 @@ def record_for(year: int, round_code: str, source: str, number: int, parsed, ans
         options = ["①", "②", "③", "④"]
     is_void = void or answer is None
     label = round_label(year, round_code)
-    layout = {"kind": "image", "imageData": image_data, "alt": f"{label} {number}번 원문"} if image_data else {"kind": "text"}
+    if recovery.get("layoutHtml"):
+        layout = {"kind": "html", "html": recovery["layoutHtml"]}
+    else:
+        layout = {"kind": "image", "imageData": image_data, "alt": f"{label} {number}번 참고 자료"} if image_data else {"kind": "text"}
     digest = hashlib.sha1(f"{year}-{round_code}-{number}-{source}".encode("utf-8")).hexdigest()[:10]
     return {
         "id": f"PAST-{year}-{round_code}-{number:03d}-{digest}",
@@ -192,7 +265,7 @@ def record_for(year: int, round_code: str, source: str, number: int, parsed, ans
     }
 
 
-def build_pdf(path: Path, year: int, round_code: str):
+def build_pdf(path: Path, year: int, round_code: str, recoveries: dict):
     with pdfplumber.open(path) as pdf:
         answers, voids = answer_map(pdf, path)
         parsed_by_number = {}
@@ -212,16 +285,24 @@ def build_pdf(path: Path, year: int, round_code: str):
                         location_by_number.setdefault(number, (page_index, half))
         questions = []
         image_count = 0
+        reconstructed_count = 0
         for number in range(1, 101):
             parsed = parsed_by_number.get(number)
-            needs_image = parsed is None or any(hint.lower() in (parsed[0].lower() if parsed else "") for hint in LAYOUT_HINTS)
             location = location_by_number.get(number)
             if location is None:
                 location = next(((page_index, half) for page_index, _, half, positions in segments if any(candidate == number for candidate, _ in positions)), None)
+            if parsed is None and location:
+                parsed = structured_text_for_question(segments, number, location)
+                if parsed:
+                    reconstructed_count += 1
+            recovery_key = f"{year}-{round_code}-{number}"
+            recovery = recoveries.get(recovery_key)
+            effective = parsed or ((recovery.get("stem"), recovery.get("options")) if recovery else None)
+            needs_image = bool(effective and any(hint.lower() in effective[0].lower() for hint in LAYOUT_HINTS))
             image_data = image_for_question(segments, number, location) if needs_image and location else None
             if image_data:
                 image_count += 1
-            questions.append(record_for(year, round_code, path.name, number, parsed, answers.get(number), number in voids, image_data))
+            questions.append(record_for(year, round_code, path.name, number, parsed, answers.get(number), number in voids, image_data, recovery))
         return questions, {
             "year": year,
             "round": round_label(year, round_code),
@@ -229,6 +310,7 @@ def build_pdf(path: Path, year: int, round_code: str):
             "source": path.name,
             "questions": len(questions),
             "parsed": len(parsed_by_number),
+            "reconstructed": reconstructed_count,
             "images": image_count,
             "void": sum(question["void"] for question in questions),
             "missingImages": [question["sourceQuestionNumber"] for question in questions if question["stem"].startswith("원문 이미지") and question["layout"]["kind"] != "image"],
@@ -239,7 +321,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("private-source/jeongbo-2020-2025-private-pack.json"))
+    parser.add_argument("--ocr-recovery", type=Path, default=Path("private-source/ocr-recovery.json"))
     args = parser.parse_args()
+    recoveries = {}
+    if args.ocr_recovery.exists():
+        recovery_data = json.loads(args.ocr_recovery.read_text(encoding="utf-8"))
+        recoveries = recovery_data.get("questions", recovery_data)
     manifest_path = args.source_root / "_generated" / "source-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     selected = []
@@ -255,7 +342,7 @@ def main() -> int:
     questions = []
     reports = []
     for year, round_code, path in selected:
-        rows, report = build_pdf(path, year, round_code)
+        rows, report = build_pdf(path, year, round_code, recoveries)
         questions.extend(rows)
         reports.append(report)
         print(json.dumps(report, ensure_ascii=False), flush=True)
@@ -275,9 +362,13 @@ def main() -> int:
     unresolved = [report for report in reports if report["missingImages"]]
     if unresolved:
         raise SystemExit(f"원문 이미지 연결 실패: {unresolved}")
+    image_placeholders = [question["id"] for question in questions if question["stem"].startswith("원문 이미지") or question["options"] == list(MARKS)]
+    if image_placeholders:
+        raise SystemExit(f"OCR 복원되지 않은 문항: {image_placeholders}")
     pack = {
         "meta": {
             "format": "jeongbo-private-pack-v2",
+            "contentRevision": "ocr-text-v1",
             "title": "정보처리기사 2020-2025 기출 18회",
             "generatedAt": datetime.now(timezone.utc).isoformat(),
             "copyright": "개인 이용 전용 - 공개 저장소 및 다른 매체에 배포 금지",
