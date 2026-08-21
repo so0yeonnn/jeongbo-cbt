@@ -26,7 +26,9 @@ jobs:
         run: |
           python tools/build_public_bank.py
           node --check app.js
+          node --check logic.js
           node --check bank.js
+          node tools/smoke_test.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -10,7 +10,7 @@ const $=id=>document.getElementById(id);
 const screens=['start-screen','quiz-screen','overview-screen','result-screen'];
 const show=id=>screens.forEach(name=>$(name).classList.toggle('active',name===id));
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const same=(a,b)=>JSON.stringify([...(a||[])].sort())===JSON.stringify([...(b||[])].sort());
+const same=globalThis.CBT_LOGIC.sameAnswers;
 const shuffle=items=>{const out=[...items];for(let i=out.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[out[i],out[j]]=[out[j],out[i]];}return out;};
 
 let exam=[];
@@ -100,17 +100,9 @@ function recordResults(){
   const store=getWrongRecords(); const now=new Date().toISOString();
   exam.forEach((q,index)=>{
     const correct=same(q.answer,answers[index]);
-    const previous=store.records[q.id]||{id:q.id,wrongCount:0,history:[]};
-    if(correct){
-      if(previous.id){previous.active=false;previous.lastResult='correct';previous.lastReviewedAt=now;}
-    }else{
-      previous.wrongCount=(previous.wrongCount||0)+1;
-      previous.active=true; previous.lastResult='wrong'; previous.lastWrongAt=now;
-      previous.selected=answers[index]||[]; previous.correct=q.answer;
-      previous.importance=q.difficulty==='상'?'높음':'보통'; previous.reviewStatus='미복습';
-    }
-    previous.question=q; previous.history=[...(previous.history||[]),{at:now,correct,selected:answers[index]||[]}].slice(-30);
-    store.records[q.id]=previous;
+    const previous=store.records[q.id]||null;
+    const updated=globalThis.CBT_LOGIC.updateWrongRecord(previous,q,answers[index]||[],correct,now);
+    if(updated)store.records[q.id]=updated;
   });
   saveWrongRecords(store);
 }
