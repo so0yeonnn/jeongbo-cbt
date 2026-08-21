@@ -171,7 +171,7 @@ function renderQuestion(){
 
 function renderOptionReasons(q){
   const rows=globalThis.CBT_OPTION_EXPLAINER.optionExplanations(q);
-  return '<section class="feedback-section option-reasons"><h4>선지별 판단</h4><ul class="option-reason-list">'+rows.map((row,index)=>'<li class="'+(row.correct?'reason-correct':'reason-wrong')+'"><div class="reason-heading"><strong>'+letters[index]+'. '+esc(row.label)+'</strong><span>'+(row.correct?'정답':'오답')+'</span></div><div class="reason-option">'+esc(q.options[index])+'</div><p>'+esc(row.detail)+'</p><small>근거: '+esc(row.basis)+'</small></li>').join('')+'</ul></section>';
+  return '<section class="feedback-section option-reasons"><h4>선지별 개념 판단</h4><ul class="option-reason-list">'+rows.map((row,index)=>'<li class="'+(row.correct?'reason-correct':'reason-wrong')+'"><div class="reason-heading"><strong>'+letters[index]+'. '+esc(row.label)+'</strong><span>'+(row.correct?'정답':'오답')+'</span></div><div class="reason-option">'+esc(q.options[index])+'</div><p><b>관련 개념</b>'+esc(row.concept)+'</p><p><b>'+(row.correct?'정답인 이유':'오답인 이유')+'</b>'+esc(row.why)+'</p><small>근거: '+esc(row.basis)+'</small></li>').join('')+'</ul></section>';
 }
 
 function renderInstantFeedback(q){

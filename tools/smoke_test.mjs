@@ -25,7 +25,14 @@ if(!concepts.includes('CBT_CONCEPTS')||!concepts.includes('slice(-6)'))throw new
 context.CBT_CONCEPTS={profile:()=>({memory:'판단 기준',compare:'비교 기준'})};
 vm.runInContext(fs.readFileSync('option-explainer.js','utf8'),context);
 const optionRows=context.CBT_OPTION_EXPLAINER.optionExplanations({stem:'옳은 것은?',options:['Builder','Visitor','Bridge','Prototype'],answer:[1],optionReasons:[]});
-if(optionRows.length!==4||!optionRows[1].correct||optionRows[0].correct||optionRows.some(row=>!row.detail||!row.basis))throw new Error('per-option explanations');
+if(optionRows.length!==4||!optionRows[1].correct||optionRows[0].correct||optionRows.some(row=>!row.concept||!row.why||!row.basis))throw new Error('per-option explanations');
+if(!optionRows[0].why.includes('생성 패턴')||!optionRows[1].why.includes('행위 패턴')||optionRows[0].why===optionRows[2].why)throw new Error('contextual GoF explanations');
+const ddlRows=context.CBT_OPTION_EXPLAINER.optionExplanations({stem:'SQL의 분류 중 DDL에 해당하지 않는 것은?',options:['UPDATE','ALTER','DROP','CREATE'],answer:[0],optionReasons:[]});
+if(!ddlRows[0].why.includes('DML')||!ddlRows[1].concept.includes('DDL'))throw new Error('negative classification explanations');
+const shellRows=context.CBT_OPTION_EXPLAINER.optionExplanations({stem:'UNIX의 쉘에 관한 설명으로 옳지 않은 것은?',options:['명령어 해석기이다.','시스템과 사용자 간의 인터페이스를 담당한다.','여러 종류의 쉘이 있다.','프로세스, 기억장치, 입출력 관리를 수행한다.'],answer:[3],optionReasons:[]});
+if(!shellRows[3].concept.includes('커널')||!shellRows[0].why.includes('부정형'))throw new Error('statement-level shell explanations');
+const cascadeRows=context.CBT_OPTION_EXPLAINER.optionExplanations({stem:'부모 행 삭제 시 자식 행을 자동 삭제하는 옵션은?',options:['CLUSTER','CASCADE','SET-NULL','RESTRICTED'],answer:[1],optionReasons:[]});
+if(!cascadeRows[1].concept.includes('연쇄 적용')||!cascadeRows[2].why.includes('NULL'))throw new Error('same-category option contrast');
 const drive=fs.readFileSync('drive-sync.js','utf8');
 if(!drive.includes('https://www.googleapis.com/auth/drive.appdata')||!drive.includes("parents:['appDataFolder']"))throw new Error('private Drive appDataFolder sync');
 if(/client_secret/i.test(drive))throw new Error('client secret must not be published');

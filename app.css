@@ -198,6 +198,7 @@ dialog::backdrop { background: rgba(17,24,39,.55); }
 .reason-heading span{flex:none;padding:3px 8px;border-radius:999px;background:#fde7e7;color:#9d2525;font-size:.75rem;font-weight:800}
 .reason-correct .reason-heading span{background:#dff4ec;color:#087354}
 .option-reason-list p{margin:8px 0 4px}
+.option-reason-list p b{display:block;margin-bottom:3px;color:var(--ink);font-size:.8rem}
 .reason-option{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--surface);font-weight:700}
 .option-reason-list small{color:var(--muted);font-weight:700}
 .review-clue{padding:12px 14px;background:var(--accent);border-left:4px solid var(--accent-line);border-radius:8px;margin:12px 0}
