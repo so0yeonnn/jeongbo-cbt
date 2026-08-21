@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111827">
   <meta name="description" content="정보처리기사 필기 모바일 CBT - 개인용 기출팩 학습">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="app.css?v=20260821e">
+  <link rel="stylesheet" href="app.css?v=20260821h">
   <title>정보처리기사 CBT</title>
 </head>
 <body>
@@ -102,6 +102,11 @@
         <h2 id="question-text"></h2>
         <div id="question-layout" class="question-detail hidden"></div>
         <fieldset id="options"><legend class="sr-only">답안 선택</legend></fieldset>
+        <div id="confidence-picker" class="confidence-picker hidden" aria-label="정답 확신도">
+          <span>이 답에 얼마나 확신하나요?</span>
+          <button type="button" data-confidence="high" class="ghost">확실해요</button>
+          <button type="button" data-confidence="low" class="ghost">애매해요</button>
+        </div>
         <div id="instant-feedback" class="instant-feedback hidden" aria-live="polite"></div>
       </article>
       <nav class="question-nav"><button id="prev-button" class="secondary">이전</button><button id="flag-button" class="ghost">검토</button><button id="next-button" class="primary">다음</button></nav>
@@ -116,17 +121,21 @@
 
     <section id="result-screen" class="screen">
       <div class="result-hero"><p id="result-label" class="kicker"></p><h2 id="result-title"></h2><p id="result-summary"></p></div>
+      <section id="pass-card" class="analysis-card"></section>
       <div id="subject-results" class="chapter-results"></div>
+      <section class="analysis-card"><div class="section-title"><h3>취약 개념 TOP10</h3><span>오답 + 애매한 정답</span></div><div id="weak-concepts"></div></section>
+      <section class="analysis-card"><div class="section-title"><h3>보유 기출 출제 빈도</h3><span>최근 6회 기준</span></div><div id="frequency-concepts"></div></section>
       <h3>문항별 정답·해설</h3><div id="answer-review" class="wrong-answers"></div>
-      <div class="stack-actions"><button id="share-button" class="primary">결과 공유</button><button id="copy-button" class="secondary">결과 복사</button><button id="download-button" class="secondary">결과 파일 저장</button><button id="reset-button" class="ghost danger">문제 선택으로</button></div>
+      <div class="stack-actions"><button id="notion-copy-button" class="primary">Notion용 개념 정리 복사</button><a class="secondary link-button" href="https://www.notion.so/3a400cdc3dea8169a52be30ca24d076c" target="_blank" rel="noopener">정보처리기사 Notion 허브 열기</a><button id="share-button" class="secondary">결과 공유</button><button id="copy-button" class="secondary">결과 복사</button><button id="download-button" class="secondary">결과 파일 저장</button><button id="reset-button" class="ghost danger">문제 선택으로</button></div>
       <p id="export-status" class="status"></p>
     </section>
   </main>
 
   <dialog id="finish-dialog"><h2>시험을 종료할까요?</h2><p id="finish-dialog-text"></p><div class="dialog-actions"><button id="cancel-finish" class="secondary">계속 풀기</button><button id="confirm-finish" class="primary">채점하기</button></div></dialog>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="logic.js?v=20260821e"></script>
-  <script src="drive-sync.js?v=20260821e"></script>
-  <script src="app.js?v=20260821e"></script>
+  <script src="logic.js?v=20260821h"></script>
+  <script src="concept-engine.js?v=20260821h"></script>
+  <script src="drive-sync.js?v=20260821h"></script>
+  <script src="app.js?v=20260821h"></script>
 </body>
 </html>

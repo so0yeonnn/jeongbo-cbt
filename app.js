@@ -23,6 +23,7 @@ let examMode='regular';
 let solveMode='study';
 let answers=[];
 let flags=[];
+let confidences=[];
 let current=0;
 let remaining=0;
 let timerId=null;
@@ -120,7 +121,7 @@ function selectedSolveMode(){return document.querySelector('input[name="solve-mo
 function startExam(items,name,resume=null,mode='regular',method=selectedSolveMode()){
   if(!items.length){$('filter-status').textContent='선택 조건에 맞는 문제가 없습니다.';return;}
   exam=items; examName=name; examMode=resume?.examMode||mode; solveMode=resume?.solveMode||method;
-  answers=resume?.answers||items.map(()=>[]); flags=resume?.flags||items.map(()=>false);
+  answers=resume?.answers||items.map(()=>[]); flags=resume?.flags||items.map(()=>false); confidences=resume?.confidences||items.map(()=>null);
   current=resume?.current||0; remaining=resume?.remaining??Math.max(600,items.length*90);
   show('quiz-screen'); renderQuestion(); saveSession(); startTimer(); window.scrollTo(0,0);
 }
@@ -145,7 +146,9 @@ function renderQuestion(){
   const layoutHtml=q.layout?.kind==='image'&&q.layout.imageData?`<img class="private-question-image" src="${q.layout.imageData}" alt="${esc(q.layout.alt||'원문 문항 이미지')}">`:q.layout?.html||'';
   layout.classList.toggle('hidden',!layoutHtml); layout.innerHTML=layoutHtml;
   $('options').innerHTML=q.options.map((option,index)=>`<div class="option"><input id="choice-${index}" type="radio" name="answer" value="${index}" ${answers[current]?.includes(index)?'checked':''}><label for="choice-${index}"><strong>${letters[index]}.</strong> ${esc(option)}</label></div>`).join('');
-  $('options').querySelectorAll('input').forEach(input=>input.onchange=()=>{answers[current]=[Number(input.value)];$('answered-count').textContent=`응답 ${answers.filter(row=>row.length).length}`;renderInstantFeedback(q);saveSession();});
+  const confidence=$('confidence-picker');confidence.classList.toggle('hidden',!answers[current]?.length);
+  $('options').querySelectorAll('input').forEach(input=>input.onchange=()=>{answers[current]=[Number(input.value)];confidence.classList.remove('hidden');$('answered-count').textContent=`응답 ${answers.filter(row=>row.length).length}`;renderInstantFeedback(q);saveSession();});
+  confidence.querySelectorAll('button').forEach(button=>{button.classList.toggle('active',button.dataset.confidence===confidences[current]);button.onclick=()=>{confidences[current]=button.dataset.confidence;renderQuestion();saveSession();};});
   renderInstantFeedback(q);
   $('prev-button').disabled=current===0; $('next-button').textContent=current===exam.length-1?'전체 보기':'다음';
   $('flag-button').classList.toggle('active',Boolean(flags[current])); $('flag-button').textContent=flags[current]?'검토 해제':'검토';
@@ -160,14 +163,15 @@ function renderInstantFeedback(q){
   const reasonRows=q.optionReasons||[]; const uniqueReasons=[...new Set(reasonRows)];
   const reasons=uniqueReasons.length===1?`<p>${esc(uniqueReasons[0])}</p>`:`<ul class="option-reason-list">${reasonRows.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('')}</ul>`;
   box.className=`instant-feedback ${correct?'correct':'incorrect'}`;
-  box.innerHTML=`<div class="feedback-title"><strong>${correct?'정답입니다':'다시 확인해 보세요'}</strong><span>정답 ${esc(answer)}</span></div><p><strong>해설</strong><br>${esc(q.explanation)}</p>${reasons}${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}`;
+  const concept=globalThis.CBT_CONCEPTS.profile(q);
+  box.innerHTML=`<div class="feedback-title"><strong>${correct?'정답입니다':'다시 확인해 보세요'}</strong><span>정답 ${esc(answer)}</span></div><section class="feedback-section"><h4>해설</h4><p>${esc(q.explanation)}</p></section>${reasons}<section class="feedback-section"><h4>핵심 개념</h4><ul>${concept.summary.map(line=>`<li>${esc(line)}</li>`).join('')}</ul></section><div class="memory-point"><strong>시험 암기 포인트</strong><span>${esc(concept.memory)}</span></div><section class="feedback-section"><h4>자주 헷갈리는 개념</h4><p>${esc(concept.compare)}</p></section><div class="keyword-tags">${concept.keywords.slice(0,5).map(word=>`<span>${esc(word)}</span>`).join('')}</div>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}`;
 }
 
-function saveSession(){writeJson(SESSION_KEY,{examIds:exam.map(q=>q.id),examName,examMode,solveMode,answers,flags,current,remaining});}
+function saveSession(){writeJson(SESSION_KEY,{examIds:exam.map(q=>q.id),examName,examMode,solveMode,answers,flags,confidences,current,remaining});}
 function showOverview(){
   show('overview-screen');
   const answered=answers.filter(row=>row.length).length;
-  $('overview-summary').textContent=`응답 ${answered}개 · 미응답 ${exam.length-answered}개 · 검토 ${flags.filter(Boolean).length}개`;
+  $('overview-summary').textContent=`응답 ${answered}개 · 미응답 ${exam.length-answered}개 · 애매 ${confidences.filter(value=>value==='low').length}개 · 검토 ${flags.filter(Boolean).length}개`;
   $('question-grid').innerHTML=exam.map((_,index)=>`<button class="${answers[index]?.length?'answered':''} ${flags[index]?'flagged':''}" data-index="${index}">${index+1}</button>`).join('');
   $('question-grid').querySelectorAll('button').forEach(button=>button.onclick=()=>{current=Number(button.dataset.index);show('quiz-screen');renderQuestion();saveSession();});
 }
@@ -190,16 +194,25 @@ function finishExam(){
   const scorable=exam.filter(q=>!q.void); const voidCount=exam.length-scorable.length;
   const correct=exam.filter((q,index)=>!q.void&&isCorrect(q,answers[index])).length;
   const pct=scorable.length?Math.round(correct/scorable.length*100):100;
-  const result={at:new Date().toISOString(),name:examName,mode:examMode,solveMode,total:exam.length,correct,pct,questionIds:exam.map(q=>q.id)};
+  const conceptAnalysis=globalThis.CBT_CONCEPTS.analyze(exam,answers,confidences);
+  const subjects=[...new Set(exam.map(q=>q.subject))];
+  const subjectStats=subjects.map(subject=>{const rows=exam.map((q,index)=>({q,index})).filter(row=>row.q.subject===subject&&!row.q.void);const good=rows.filter(row=>isCorrect(row.q,answers[row.index])).length;return {subject,good,total:rows.length,rate:rows.length?Math.round(good/rows.length*100):100};});
+  const isFullExam=subjects.length===5&&exam.length>=98;
+  const passed=isFullExam&&pct>=60&&subjectStats.every(row=>row.rate>=40);
+  const result={at:new Date().toISOString(),name:examName,mode:examMode,solveMode,total:exam.length,correct,pct,questionIds:exam.map(q=>q.id),subjectStats,weakConcepts:conceptAnalysis.filter(row=>row.wrong||row.uncertain).slice(0,10).map(({subject,concept,total,correct,wrong,uncertain,rate})=>({subject,concept,total,correct,wrong,uncertain,rate}))};
   const results=readJson(RESULT_KEY,[]); results.unshift(result); writeJson(RESULT_KEY,results.slice(0,100));
   show('result-screen'); $('result-label').textContent=examName; $('result-title').textContent=`${correct} / ${scorable.length} (${pct}%)`;
   const methodLabel=solveMode==='study'?'해설 학습 모드':'실전 시험 모드';
   $('result-summary').textContent=`${methodLabel} · ${examMode==='wrong-review'?'맞힌 문항은 활성 오답에서 제외했으며 전체 기록은 유지했습니다.':`새 오답 ${scorable.length-correct}문항을 고유 ID 기준으로 누적했습니다.`}${voidCount?` · 정답 불명확 ${voidCount}문항 채점 제외`:''}`;
-  const subjects=[...new Set(exam.map(q=>q.subject))];
-  $('subject-results').innerHTML=subjects.map(subject=>{
-    const rows=exam.map((q,index)=>({q,index})).filter(row=>row.q.subject===subject&&!row.q.void); const good=rows.filter(row=>isCorrect(row.q,answers[row.index])).length; const rate=rows.length?Math.round(good/rows.length*100):100;
-    return `<div class="chapter-row"><strong>${esc(subject)}</strong><span>${good}/${rows.length} · ${rate}%</span><div class="chapter-bar"><span style="width:${rate}%"></span></div></div>`;
+  $('pass-card').className=`analysis-card pass-card ${isFullExam?(passed?'passed':'failed'):'practice'}`;
+  $('pass-card').innerHTML=isFullExam?`<strong>${passed?'합격 기준 충족':'합격 기준 미충족'}</strong><span>평균 60점 이상 · 모든 과목 40점 이상</span>`:`<strong>학습 진단 결과</strong><span>정규 100문항 응시 때 합격 여부를 판정합니다.</span>`;
+  $('subject-results').innerHTML=subjectStats.map(row=>{
+    return `<div class="chapter-row"><strong>${esc(row.subject)}</strong><span>${row.good}/${row.total} · ${row.rate}%</span><div class="chapter-bar"><span style="width:${row.rate}%"></span></div></div>`;
   }).join('');
+  const weak=conceptAnalysis.filter(row=>row.wrong||row.uncertain).slice(0,10);
+  $('weak-concepts').innerHTML=weak.length?weak.map((row,index)=>`<div class="concept-row"><b>${index+1}. ${esc(row.concept)}</b><small>${esc(row.subject)} · 오답 ${row.wrong} · 애매 ${row.uncertain} · 정답률 ${row.rate}%</small><span class="priority ${index<3?'high':index<6?'medium':'low'}">${index<3?'우선 복습':index<6?'중요':'보통'}</span></div>`).join(''):'<p class="empty-analysis">현재 취약 개념이 없습니다.</p>';
+  const frequency=globalThis.CBT_CONCEPTS.frequency(questionBank).slice(0,10);
+  $('frequency-concepts').innerHTML=frequency.map(row=>`<div class="concept-row"><b>${esc(row.concept)}</b><small>${esc(row.subject)} · 최근 6회 ${row.count}문항</small><span class="frequency ${row.level==='상'?'high':row.level==='중'?'medium':'low'}">${row.level}</span></div>`).join('');
   $('answer-review').innerHTML=exam.map((q,index)=>renderReview(q,index)).join('');
   window.scrollTo(0,0);
 }
@@ -211,7 +224,13 @@ function renderReview(q,index){
   const reasonRows=q.optionReasons||[]; const uniqueReasons=[...new Set(reasonRows)];
   const reasons=uniqueReasons.length===1?`<p>${esc(uniqueReasons[0])}</p>`:`<ul class="option-reason-list">${reasonRows.map((reason,i)=>`<li><strong>${letters[i]}.</strong> ${esc(reason)}</li>`).join('')}</ul>`;
   if(q.void)return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">채점 제외 · ${esc(q.id)}</span><p>${esc(q.explanation)}</p></article>`;
-  return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span><p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p>${reasons}${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}${q.conceptDetail?`<p><strong>관련 개념:</strong> ${esc(q.conceptDetail)}</p>`:''}${q.judgmentRule?`<p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p>`:''}</article>`;
+  const concept=globalThis.CBT_CONCEPTS.profile(q);const low=confidences[index]==='low';
+  return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span>${low?'<span class="uncertain-badge">애매한 정답</span>':''}<p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p>${reasons}<div class="memory-point"><strong>${esc(concept.label)}</strong><span>${esc(concept.memory)}</span></div><p><strong>헷갈리는 개념:</strong> ${esc(concept.compare)}</p><div class="keyword-tags">${concept.keywords.slice(0,5).map(word=>`<span>${esc(word)}</span>`).join('')}</div>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}${q.conceptDetail?`<p><strong>관련 개념:</strong> ${esc(q.conceptDetail)}</p>`:''}${q.judgmentRule?`<p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p>`:''}</article>`;
+}
+
+function notionConceptText(){
+  const rows=globalThis.CBT_CONCEPTS.analyze(exam,answers,confidences).filter(row=>row.wrong||row.uncertain);
+  return `# 정보처리기사 개념 중심 복습\n\n- 응시: ${examName}\n- 날짜: ${new Date().toLocaleString('ko-KR')}\n- 원문 문제·선지는 포함하지 않음\n\n${rows.map(row=>`## ${row.concept}\n- 과목: ${row.subject}\n- 관련 문제 수: ${row.total}\n- 맞은 횟수: ${row.correct}\n- 틀린 횟수: ${row.wrong}\n- 정답률: ${row.rate}%\n- 애매하게 맞힌 횟수: ${row.uncertain}\n- 핵심 개념: ${row.profile.summary.join(' ')}\n- 암기 포인트: ${row.profile.memory}\n- 헷갈리는 개념: ${row.profile.compare}\n- 관련 키워드: ${row.profile.keywords.join(', ')}`).join('\n\n')||'취약 개념 없음'}`;
 }
 
 function exportText(){
@@ -270,6 +289,7 @@ $('reset-button').onclick=renderStart;
 $('copy-button').onclick=async()=>{await navigator.clipboard.writeText(exportText());$('export-status').textContent='결과를 복사했습니다.';};
 $('share-button').onclick=async()=>{const text=exportText();if(navigator.share)await navigator.share({title:'정보처리기사 CBT 결과',text});else{await navigator.clipboard.writeText(text);$('export-status').textContent='공유 기능 대신 결과를 복사했습니다.';}};
 $('download-button').onclick=()=>{const blob=new Blob([exportText()],{type:'text/markdown;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='정보처리기사-CBT-결과.md';a.click();URL.revokeObjectURL(a.href);};
+$('notion-copy-button').onclick=async()=>{await navigator.clipboard.writeText(notionConceptText());$('export-status').textContent='문제 원문 없이 개념 중심 정리를 복사했습니다. Notion 허브에 붙여 넣으세요.';};
 
 function setDriveStatus(message,tone=''){$('drive-status').textContent=message;$('drive-status').className=`status ${tone}`.trim();}
 function setDriveConnection(connected){
