@@ -21,4 +21,6 @@ if(!app.includes("jeongbo-private-pack-v2")||!app.includes('questions.length!==1
 const drive=fs.readFileSync('drive-sync.js','utf8');
 if(!drive.includes('https://www.googleapis.com/auth/drive.appdata')||!drive.includes("parents:['appDataFolder']"))throw new Error('private Drive appDataFolder sync');
 if(/client_secret/i.test(drive))throw new Error('client secret must not be published');
+const privacy=fs.readFileSync('privacy.html','utf8');
+if(!privacy.includes('drive.appdata')||!privacy.includes('별도의 운영 서버로 개인정보를 수집하거나 전송하지 않습니다'))throw new Error('privacy disclosure');
 console.log(JSON.stringify({publicQuestions:0,wrongCount:row.wrongCount,active:row.active,history:row.history.length,driveScope:'appdata'}));
