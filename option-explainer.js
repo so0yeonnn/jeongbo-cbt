@@ -1,7 +1,35 @@
 'use strict';
 
 (()=>{
+  const compactTopics={
+    CASE:{
+      definition:'소프트웨어 생명주기 전 과정을 자동화 도구로 지원하는 개발 환경',
+      features:['그래픽 기반 분석·설계','단계별 산출물 연결·추적','다양한 개발 모형 지원']
+    }
+  };
   const facts=[
+    [/^\+$/,'+는 두 수를 더하는 산술 연산자이며, 일부 언어에서는 문자열이나 컬렉션을 이어 붙이는 데도 사용한다.','산술 연산자'],
+    [/^-$/,'-는 두 수의 차를 구하거나 한 값의 부호를 반대로 만드는 산술 연산자다.','산술 연산자'],
+    [/^\*$/,'*는 두 값을 곱하는 산술 연산자다. 포인터를 지원하는 C에서는 문맥에 따라 역참조 기호로도 쓰인다.','산술 연산자'],
+    [/^\/$/,'/는 나눗셈 연산자다. 정수끼리 계산할 때 결과 처리 방식은 언어에 따라 다르므로 자료형을 함께 확인한다.','산술 연산자'],
+    [/^\*\*$/,'Python에서 **는 왼쪽 값을 오른쪽 값만큼 거듭제곱하는 연산자다. 예: 2 ** 3 = 8.','산술 연산자'],
+    [/^\/\/$/,'Python에서 //는 나눗셈의 몫을 내림해 반환하는 바닥 나눗셈 연산자다. 예: 7 // 2 = 3.','산술 연산자'],
+    [/^%$/,'%는 나눗셈의 나머지를 구하는 연산자다. 예: 7 % 2 = 1.','산술 연산자'],
+    [/^=$/,'=는 오른쪽에서 계산한 값을 왼쪽 변수에 저장하는 대입 연산자다. 두 값이 같은지 비교하는 ==와 다르다.','대입 연산자'],
+    [/^==$/,'==는 양쪽 값이 같은지 비교해 참 또는 거짓을 만드는 동등 비교 연산자다. 값을 저장하는 =와 다르다.','비교 연산자'],
+    [/^!=$/,'!=는 양쪽 값이 서로 다른지 비교해 참 또는 거짓을 만드는 비교 연산자다.','비교 연산자'],
+    [/^(?:<|>|<=|>=)$/,'<, >, <=, >=는 두 값의 크기 관계를 비교해 참 또는 거짓을 만드는 관계 연산자다.','비교 연산자'],
+    [/^\(\)$/,'괄호 ()는 식의 계산 순서를 먼저 묶거나 함수 호출의 인수를 표시한다. 연산자 우선순위 문제에서는 괄호 안을 가장 먼저 계산한다.','괄호 표기'],
+    [/^&&$/,'C·Java에서 &&는 두 조건이 모두 참일 때만 참인 논리 AND 연산자다.','논리 연산자'],
+    [/^\|\|$/,'C·Java에서 ||는 두 조건 중 하나 이상이 참이면 참인 논리 OR 연산자다.','논리 연산자'],
+    [/^!$/,'C·Java에서 !는 참과 거짓을 반대로 바꾸는 논리 NOT 연산자다.','논리 연산자'],
+    [/^\+\+$/,'++는 변수 값을 1 증가시키는 증가 연산자다. 전위형은 증가 후 값을, 후위형은 사용 후 증가한 값을 적용한다.','증감 연산자'],
+    [/^--$/,'--는 변수 값을 1 감소시키는 감소 연산자다. 전위형과 후위형은 값이 적용되는 시점이 다르다.','증감 연산자'],
+    [/\bCASE\b/i,'CASE(Computer-Aided Software Engineering)는 요구분석·설계·구현·테스트·문서화 등 소프트웨어 생명주기 활동을 자동화 도구로 지원해 개발 생산성과 산출물의 일관성을 높이는 방식이다.','CASE'],
+    [/그래픽\s*지원/i,'CASE 도구는 모델과 설계 산출물을 다이어그램으로 작성·관리할 수 있도록 그래픽 기능을 지원한다.','CASE'],
+    [/소프트웨어\s*생명주기\s*전\s*단계의\s*연결/i,'CASE는 생명주기 각 단계의 산출물을 저장소로 연결해 단계 사이의 추적성과 일관성을 유지한다.','CASE'],
+    [/언어\s*번역/i,'언어 번역은 컴파일러·인터프리터·어셈블러처럼 원시 프로그램을 다른 언어나 실행 형태로 바꾸는 언어 처리 기능이다. CASE의 주요 고유 기능과는 구분한다.','언어 처리'],
+    [/다양한\s*소프트웨어\s*개발\s*모형\s*지원/i,'CASE 도구는 폭포수·프로토타입·구조적 방법론 등 여러 개발 모형과 분석·설계 방법을 지원할 수 있다.','CASE'],
     [/행위\s*패턴/i,'객체 사이의 책임 분배와 협력 방식을 다루는 GoF 패턴 분류다.','행위 패턴'],
     [/생성\s*패턴/i,'객체 생성 과정과 인스턴스화 책임을 분리하는 GoF 패턴 분류다.','생성 패턴'],
     [/구조\s*패턴/i,'클래스와 객체를 조합해 더 큰 구조를 만드는 GoF 패턴 분류다.','구조 패턴'],
@@ -204,7 +232,9 @@
       }else if(optionFact){
         concept=`${optionFact.term}: ${optionFact.description}`;
         if(correct&&asksNegative&&stemFact&&optionFact.group!==stemFact.group){
-          why=`문항은 ${stemFact.group}에 해당하지 않는 것을 묻는다. 이 선지는 ${optionFact.group}이므로 대상 분류와 달라 정답이다.`;
+          why=stemFact.group==='CASE'&&optionFact.group==='언어 처리'
+            ?`“${wording}”은 CASE가 아니라 컴파일러·인터프리터·어셈블러가 수행하는 언어 처리 기능이다.`
+            :`“${wording}”은 “${stemFact.group}”가 아니라 “${optionFact.group}” 기능이다.`;
         }else if(correct){
           why=asksNegative?'정답표와 개념 분류를 함께 보면 이 설명은 문항의 부정 조건에 해당한다.':`이 선지의 ${optionFact.group} 특성이 문항에서 요구한 조건과 일치한다.`;
         }else if(asksNegative&&stemFact&&optionFact.group===stemFact.group){
@@ -231,5 +261,37 @@
       return {correct,label:correct?'정답 선지':'오답 선지',concept,why,basis,focus:cleanStem(q.stem)};
     });
   }
-  globalThis.CBT_OPTION_EXPLAINER={optionExplanations,findFact};
+  function topicExplanation(q){
+    const profile=globalThis.CBT_CONCEPTS.profile(q);
+    const fact=findFact(q.stem);
+    if(fact)return {
+      title:`${fact.term}부터 이해하기`,
+      definition:fact.description,
+      examPoint:profile.memory,
+      compare:profile.compare
+    };
+    const keywords=profile.keywords?.slice(0,2).join(' · ')||profile.label;
+    return {
+      title:`${profile.label}부터 이해하기`,
+      definition:`${profile.summary.join(' ')}`,
+      examPoint:`${keywords}: ${profile.memory}`,
+      compare:profile.compare
+    };
+  }
+  function compactExplanation(q){
+    const profile=globalThis.CBT_CONCEPTS.profile(q);
+    const stemFact=findFact(q.stem);
+    const curated=compactTopics[stemFact?.group];
+    const rows=optionExplanations(q);
+    const definition=curated?.definition||stemFact?.description||profile.summary[0];
+    const matchedFeatures=stemFact?(q.options||[])
+      .map(findFact)
+      .filter(fact=>fact&&fact.group===stemFact.group&&fact.description!==definition)
+      .map(fact=>fact.description):[];
+    const fallbackFeatures=(profile.summary||[]).filter(line=>line!==definition).concat(profile.memory||[]);
+    const features=curated?.features||[...new Set(matchedFeatures.length?matchedFeatures:fallbackFeatures)].slice(0,3);
+    const answers=(q.answer||[]).map(index=>({index,text:q.options[index],contrast:rows[index]?.why||''}));
+    return {keyword:stemFact?.term||profile.label,definition,features,answers};
+  }
+  globalThis.CBT_OPTION_EXPLAINER={optionExplanations,topicExplanation,compactExplanation,findFact};
 })();
