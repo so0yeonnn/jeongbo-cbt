@@ -11,7 +11,10 @@ let packMeta=null;
 const letters=['A','B','C','D'];
 const $=id=>document.getElementById(id);
 const screens=['start-screen','quiz-screen','overview-screen','result-screen'];
-const show=id=>screens.forEach(name=>$(name).classList.toggle('active',name===id));
+const show=id=>{
+  screens.forEach(name=>$(name).classList.toggle('active',name===id));
+  if(id!=='quiz-screen')$('quick-next-button')?.classList.add('hidden');
+};
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const same=globalThis.CBT_LOGIC.sameAnswers;
 const isCorrect=(q,answer)=>Boolean(q?.void)||(q?.acceptAny?answer?.length===1&&q.answer.includes(answer[0]):same(q.answer,answer));
@@ -162,11 +165,19 @@ function renderQuestion(){
   layout.classList.toggle('hidden',!layoutHtml); layout.innerHTML=layoutHtml;
   $('options').innerHTML=q.options.map((option,index)=>`<div class="option"><input id="choice-${index}" type="radio" name="answer" value="${index}" ${answers[current]?.includes(index)?'checked':''}><label for="choice-${index}"><strong>${letters[index]}.</strong> ${esc(option)}</label></div>`).join('');
   const confidence=$('confidence-picker');confidence.classList.toggle('hidden',!answers[current]?.length);
-  $('options').querySelectorAll('input').forEach(input=>input.onchange=()=>{answers[current]=[Number(input.value)];confidence.classList.remove('hidden');$('answered-count').textContent=`응답 ${answers.filter(row=>row.length).length}`;renderInstantFeedback(q);saveSession();});
+  $('options').querySelectorAll('input').forEach(input=>input.onchange=()=>{answers[current]=[Number(input.value)];confidence.classList.remove('hidden');$('answered-count').textContent=`응답 ${answers.filter(row=>row.length).length}`;renderInstantFeedback(q);syncQuickNext();saveSession();});
   confidence.querySelectorAll('button').forEach(button=>{button.classList.toggle('active',button.dataset.confidence===confidences[current]);button.onclick=()=>{confidences[current]=button.dataset.confidence;renderQuestion();saveSession();};});
   renderInstantFeedback(q);
   $('prev-button').disabled=current===0; $('next-button').textContent=current===exam.length-1?'전체 보기':'다음';
+  syncQuickNext();
   $('flag-button').classList.toggle('active',Boolean(flags[current])); $('flag-button').textContent=flags[current]?'검토 해제':'검토';
+}
+
+function syncQuickNext(){
+  const button=$('quick-next-button');
+  const visible=$('quiz-screen').classList.contains('active')&&solveMode==='study'&&Boolean(answers[current]?.length);
+  button.classList.toggle('hidden',!visible);
+  button.textContent=current===exam.length-1?'전체 보기 →':'다음 →';
 }
 
 function renderOptionReasons(q,selectedAnswers=answers[current]||[]){
@@ -313,6 +324,7 @@ $('resume-button').onclick=()=>{
 };
 $('prev-button').onclick=()=>{if(current>0){current-=1;renderQuestion();saveSession();window.scrollTo(0,0);}};
 $('next-button').onclick=()=>{if(current<exam.length-1){current+=1;renderQuestion();saveSession();window.scrollTo(0,0);}else showOverview();};
+$('quick-next-button').onclick=()=>$('next-button').click();
 $('flag-button').onclick=()=>{flags[current]=!flags[current];renderQuestion();saveSession();};
 $('open-overview').onclick=showOverview; $('return-button').onclick=()=>{show('quiz-screen');renderQuestion();};
 $('finish-button').onclick=()=>{$('finish-dialog-text').textContent=`응답 ${answers.filter(row=>row.length).length}/${exam.length}문항입니다.`;$('finish-dialog').showModal();};
