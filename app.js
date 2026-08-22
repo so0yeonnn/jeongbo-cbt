@@ -173,7 +173,7 @@ function renderOptionReasons(q,selectedAnswers=answers[current]||[]){
   const rows=globalThis.CBT_OPTION_EXPLAINER.optionExplanations(q);
   return '<section class="feedback-section option-reasons"><h4>선지별 개념 해설 <small>선지를 눌러 펼치기</small></h4><ul class="option-reason-list">'+rows.map((row,index)=>{
     const opened=row.correct||selectedAnswers.includes(index);
-    return '<li class="'+(row.correct?'reason-correct':'reason-wrong')+'"><details '+(opened?'open':'')+'><summary><strong>'+letters[index]+'. '+esc(q.options[index])+'</strong><span>'+(row.correct?'정답':'오답')+'</span></summary><div class="reason-body"><p><b>이 선지의 개념</b>'+esc(row.concept)+'</p><p><b>'+(row.correct?'왜 정답인가요?':'왜 정답이 아닌가요?')+'</b>'+esc(row.why)+'</p></div></details></li>';
+    return '<li class="'+(row.correct?'reason-correct':'reason-wrong')+'"><details '+(opened?'open':'')+'><summary><strong>'+letters[index]+'. '+esc(q.options[index])+'</strong><span>'+(row.correct?'정답':'오답')+'</span></summary><div class="reason-body"><p><b>개념</b>'+esc(row.concept)+'</p><p><b>판단</b>'+esc(row.why)+'</p></div></details></li>';
   }).join('')+'</ul></section>';
 }
 
@@ -258,7 +258,7 @@ function renderReview(q,index){
   const reasons=renderOptionReasons(q,answers[index]||[]);
   if(q.void)return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">채점 제외 · ${esc(q.id)}</span><p>${esc(q.explanation)}</p></article>`;
   const concept=globalThis.CBT_CONCEPTS.profile(q);const low=confidences[index]==='low';
-  return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span>${low?'<span class="uncertain-badge">애매한 정답</span>':''}<p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p>${reasons}<div class="memory-point"><strong>${esc(concept.label)}</strong><span>${esc(concept.memory)}</span></div><p><strong>헷갈리는 개념:</strong> ${esc(concept.compare)}</p><div class="keyword-tags">${concept.keywords.slice(0,5).map(word=>`<span>${esc(word)}</span>`).join('')}</div>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}${q.conceptDetail?`<p><strong>관련 개념:</strong> ${esc(q.conceptDetail)}</p>`:''}${q.judgmentRule?`<p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p>`:''}</article>`;
+  return `<article class="wrong"><h4>${index+1}. ${esc(q.stem)}</h4><span class="source-badge">${esc(q.sourceType)} · ${esc(q.id)}</span>${low?'<span class="uncertain-badge">애매한 정답</span>':''}<p class="${correct?'answer-good':'answer-bad'}">내 답: ${esc(selected)}</p><p class="answer-good">정답: ${esc(answer)}</p><p><strong>정답 근거:</strong> ${esc(q.explanation)}</p>${reasons}<div class="memory-point"><strong>${esc(concept.label)}</strong><span>${esc(concept.memory)}</span></div><p><strong>헷갈리는 개념:</strong> ${esc(concept.compare)}</p><div class="keyword-tags">${concept.keywords.slice(0,5).map(word=>`<span>${esc(word)}</span>`).join('')}</div>${q.clue?`<div class="review-clue"><strong>정답을 가르는 단서</strong><br>${esc(q.clue)}</div>`:''}${q.conceptDetail?`<p><strong>핵심 원리:</strong> ${esc(q.conceptDetail)}</p>`:''}${q.judgmentRule?`<p><strong>유사 문제 판단 기준:</strong> ${esc(q.judgmentRule)}</p>`:''}</article>`;
 }
 
 function notionConceptText(){

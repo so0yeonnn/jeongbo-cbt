@@ -4,7 +4,7 @@
   const compactTopics={
     CASE:{
       definition:'소프트웨어 생명주기 전 과정을 자동화 도구로 지원하는 개발 환경',
-      features:['그래픽 기반 분석·설계','단계별 산출물 연결·추적','다양한 개발 모형 지원']
+      features:['그래픽 기반 분석·설계, 단계별 산출물 연결·추적','다양한 개발 모형 지원']
     }
   };
   const facts=[
@@ -115,6 +115,15 @@
     [/\bSelect\b|선택\s*연산/i,'관계대수에서 조건을 만족하는 행을 고르는 연산이다.','관계대수'],
     [/\bProject\b|투영\s*연산/i,'관계대수에서 필요한 열을 고르는 연산이다.','관계대수'],
     [/\bDivision\b|나눗셈\s*연산/i,'특정 속성값 집합을 모두 만족하는 튜플을 구하는 관계대수 연산이다.','관계대수'],
+    [/전위\s*순회|Preorder/i,'전위 순회는 루트→왼쪽 서브트리→오른쪽 서브트리 순서로 방문하는 트리 순회 방식이다.','트리 순회'],
+    [/중위\s*순회|Inorder/i,'중위 순회는 왼쪽 서브트리→루트→오른쪽 서브트리 순서로 방문하는 트리 순회 방식이다.','트리 순회'],
+    [/후위\s*순회|Postorder/i,'후위 순회는 왼쪽 서브트리→오른쪽 서브트리→루트 순서로 방문하는 트리 순회 방식이다.','트리 순회'],
+    [/이진\s*탐색\s*트리|BST/i,'이진 탐색 트리는 왼쪽 자식은 부모보다 작고 오른쪽 자식은 부모보다 크게 배치하는 이진 트리다.','트리'],
+    [/이진\s*트리/i,'이진 트리는 각 노드가 최대 두 개의 자식 노드를 갖는 트리다.','트리'],
+    [/트리/i,'트리는 사이클 없이 노드를 계층적으로 연결한 자료구조다.','트리'],
+    [/깊이\s*우선|\bDFS\b/i,'깊이 우선 탐색은 한 경로를 끝까지 탐색한 뒤 되돌아가며 방문하는 그래프 탐색 방식이다.','그래프 탐색'],
+    [/너비\s*우선|\bBFS\b/i,'너비 우선 탐색은 시작 정점에서 가까운 정점부터 레벨 순서로 방문하는 그래프 탐색 방식이다.','그래프 탐색'],
+    [/그래프/i,'그래프는 정점과 정점을 연결하는 간선으로 관계를 표현하는 자료구조다.','그래프'],
     [/스택|\bStack\b|LIFO/i,'가장 나중에 삽입한 데이터를 먼저 꺼내는 LIFO 자료구조다.','자료구조'],
     [/큐|\bQueue\b|FIFO/i,'가장 먼저 삽입한 데이터를 먼저 꺼내는 FIFO 자료구조다.','자료구조'],
     [/선택\s*정렬/i,'최솟값을 찾아 앞쪽 위치와 교환하는 과정을 반복하는 정렬이다.','정렬'],
@@ -181,8 +190,9 @@
     [/\bPaaS\b/i,'애플리케이션 개발·실행 플랫폼을 서비스로 제공한다.','클라우드 서비스'],
     [/\bSaaS\b/i,'완성된 애플리케이션을 인터넷을 통해 서비스로 제공한다.','클라우드 서비스']
   ];
-  const generic=/원본\s*기출|정답표.*기준|정답표와\s*대조/;
+  const generic=/원본\s*기출|정답표.*기준|정답표와\s*대조|선지와\s*개념\s*대조|목적·대상·결과|판단\s*기준|관련\s*개념/;
   const negative=/아닌|옳지\s*않|틀린|거리가\s*먼|포함되지\s*않|해당하지\s*않/;
+  const analytical=/계산|결과|출력|실행|순회|트리|그래프|코드|프로그램|SQL|관계대수|진수|페이지|스케줄|평균|응답\s*시간|경계\s*값/i;
   const findFact=text=>{
     for(const [pattern,description,group] of facts){
       const match=String(text||'').match(pattern);
@@ -281,17 +291,35 @@
   function compactExplanation(q){
     const profile=globalThis.CBT_CONCEPTS.profile(q);
     const stemFact=findFact(q.stem);
+    const correctText=(q.answer||[]).map(index=>q.options[index]).join(' / ');
+    const correctFact=findFact(correctText);
     const curated=compactTopics[stemFact?.group];
     const rows=optionExplanations(q);
-    const definition=curated?.definition||stemFact?.description||profile.summary[0];
+    const isAnalysis=analytical.test(q.stem||'')||Boolean(q.layout?.html)||q.layout?.kind==='image';
+    const sourceExplanation=q.explanation&&!generic.test(q.explanation)
+      ?String(q.explanation).trim().split(/(?<=[.!?])\s+/).slice(0,2).join(' ')
+      :'';
+    const verifiedAnalysis=boundaryExplanation(q,correctText,true)||distinctExplanation(q,true);
+    const definition=curated?.definition||verifiedAnalysis?.concept||stemFact?.description||correctFact?.description||profile.summary[0];
     const matchedFeatures=stemFact?(q.options||[])
       .map(findFact)
       .filter(fact=>fact&&fact.group===stemFact.group&&fact.description!==definition)
       .map(fact=>fact.description):[];
     const fallbackFeatures=(profile.summary||[]).filter(line=>line!==definition).concat(profile.memory||[]);
-    const features=curated?.features||[...new Set(matchedFeatures.length?matchedFeatures:fallbackFeatures)].slice(0,3);
-    const answers=(q.answer||[]).map(index=>({index,text:q.options[index],contrast:rows[index]?.why||''}));
-    return {keyword:stemFact?.term||profile.label,definition,features,answers};
+    let features=curated?.features||[...new Set(matchedFeatures.length?matchedFeatures:fallbackFeatures)].slice(0,2);
+    if(isAnalysis){
+      features=verifiedAnalysis?[verifiedAnalysis.why]
+        :sourceExplanation?[sourceExplanation]
+        :stemFact?.group==='트리 순회'?[`그림의 노드를 ${stemFact.description.match(/루트|왼쪽|오른쪽/g)?.join('→')||'정해진 순서'} 순서로 추적한 결과: ${correctText}`]
+        :[];
+    }
+    const answers=(q.answer||[]).map(index=>{
+      let conclusion=rows[index]?.why||'';
+      if(isAnalysis&&features.length)conclusion=`조건을 적용한 결과가 “${q.options[index]}”과 일치한다.`;
+      else if(isAnalysis&&!stemFact&&!correctFact)conclusion='제공된 정답표와 문항 조건으로 확인된 답이며, 검증되지 않은 개념 추론은 추가하지 않는다.';
+      return {index,text:q.options[index],contrast:conclusion};
+    });
+    return {keyword:stemFact?.term||correctFact?.term||profile.label,definition,features,answers,isAnalysis};
   }
   globalThis.CBT_OPTION_EXPLAINER={optionExplanations,topicExplanation,compactExplanation,findFact};
 })();
